@@ -2,6 +2,21 @@
 #define _LAB_TEMPLATE_H_
 #endif //_LAB_TEMPLATE_H_
 
+/* Defines */
+#define STUDENT1 4291509
+#define STUDENT2 3441001
+#define NUMCHARACTERS 16
+#define NUMLINES 2
+#define BASE10 10
+#define BASE16 16
+#define MAXNUM 99
+
+#define PI 3.14159265
+#define WHEEL_DIAMETER 5.5
+#define WHEEL_DISTANCE 20
+#define TILE_SIZE 30.5
+#define PI_SLICES 5.625
+
 /* Includes */
 
 #include <stdio.h>
@@ -12,7 +27,7 @@
 #include "system.h"
 #include "sys/alt_irq.h"
 #include "altera_avalon_pio_regs.h"
-#include "altera_avalon_uart_regs.h"
+#include "fe_uartlite.h"
 
 /* Debugging Constants */
 
@@ -25,6 +40,99 @@
 #undef DEBUG_UART_RECV_ISR
 
 #undef DEBUG_UART_XMIT
+
+/******************************************************************************
+*
+* Name
+* ************
+* reverse_bit_pattern
+*
+*
+* Description
+* *************
+* 8-Bit Bit-Wise Reverse
+*
+*
+* Parameters
+* *************
+* Name Type In/Out Description
+* ----------- ---------- --------------- ---------------
+* inByte alt_u8 in an unsigned charater of 8 bits
+*
+* Returns
+* *************
+* Type Description
+* ---------- ---------------
+* alt_u8 the bit-wise invwerse of the input parameter
+*
+*
+******************************************************************************
+*/
+static alt_u8 reverse_bit_pattern(alt_u8 inByte);
+
+/******************************************************************************
+*
+* Name
+* ************
+* alt_u8 hex_to_dec
+*
+*
+* Description
+* *************
+* Produce a haxadecimal which is written like the decimal input.
+* Ex: 23 >> 0x23
+*
+* Parameters
+* *************
+* Name Type In/Out Description
+* ----------- ---------- --------------- ---------------
+* inByte alt_u8 in unsigned charater of 8 bits which is the decimal value.
+*
+* Returns
+* *************
+* Type Description
+* ---------- ---------------
+* alt_u8 nsigned charater of 8 bits which is the hexadecimal value.
+*
+*
+******************************************************************************
+*/
+static alt_u8 hex_to_dec(alt_u8 hex);
+
+/******************************************************************************
+*
+* Name
+* ************
+* alt_u8 *center_string
+*
+*
+* Description
+* *************
+* Centers the input string. The input string takes in a string with up to
+* 2 lines of which it centers both into 2x16 character lines.
+* 
+* Note: The function returns a heap allocated pointer which must be free'd!
+* 
+* Ex: 
+* Input = "Testing\n123"
+* Output = "    Testing\n      123"
+*
+* Parameters
+* *************
+* Name Type In/Out Description
+* ----------- ---------- --------------- ---------------
+* msg alt_u8* In The 8-bit pointer to the string to center.
+*
+* Returns
+* *************
+* Type Description
+* ---------- ---------------
+* alt_u8* 8-bit pointer to the centered string
+*
+*
+******************************************************************************
+*/
+static alt_u8 *center_string(alt_u8 * msg);
 
 /* LCD Related Prototype */
 
@@ -68,11 +176,13 @@ static void send_message_to_uart(alt_u8, alt_u8*);
 
 /* Message Types */
 
-#define MSG_O_CONNECT    0x01
-#define MSG_O_DISCONNECT 0x02
-#define MSG_O_READ_MOD   0x03
-#define MSG_O_WRITE_MOD  0x03
-#define MSG_O_SUBSCRIBE  0x05
+#define MSG_O_CONNECT     0x01                                        
+#define MSG_O_DISCONNECT  0x02                                        
+#define MSG_O_READ_MOD    0x03                                        
+#define MSG_O_WRITE_MOD   0x03                                        
+#define MSG_O_SUBSCRIBE   0x05                                        
+#define MSG_O_DATA_STREAM 0x0A                                        
+#define MSG_O_OPEN_COM    0x0C                                        
 
 #define MSG_I_ACK         0x01
 #define MSG_I_MOD_REPLY   0x02
@@ -151,6 +261,14 @@ static void send_message_to_uart(alt_u8, alt_u8*);
  * Other Constants 
  */
 
+/* Sensor Location */
+#define LEFT_WHEEL  0x04
+#define RIGHT_WHEEL 0x05
+
+/* Sensor Values */
+#define VAL_LEFT_WHEEL  0x0D
+#define VAL_RIGHT_WHEEL 0x0E
+
 /* LED Values */
 
 #define VAL_LED_ALL_ON  0xFF
@@ -188,6 +306,13 @@ static void send_message_to_uart(alt_u8, alt_u8*);
 #define VAL_DIG_IN_SUB_CONFIG_TIMESTAMPS  0x01
 #define VAL_DIG_IN_SUB_CONFIG_DIFF_FILTER 0x02
 
+/* Value to Place into the 'Port Number' Field
+ * of the 'Open COM Port' Message of the UART
+ * Module
+ */
+
+#define VAL_UART_PORT_NO 0x01
+
 /* Command Constants by Module */
 
 #define CMD_DIG_IN_RESET_COUNTERS 0x01
@@ -210,8 +335,12 @@ static void lin_pwm_rotate_cw();
 static void lin_pwm_rotate_ccw();
 
 static void lin_dig_in_reset_counters();
+static void lin_dig_in_read_left_counter();
 static void lin_dig_in_enable_hsi();
 static void lin_dig_in_subscribe();
+
+static void lin_uart_open();
+static void lin_uart_send_message(alt_u8*);
 
 /* Helper Data Types for LIN Message Dispatch */
 
@@ -228,3 +357,40 @@ typedef struct lin_message {
 static void lin_message_init(LIN_MESSAGE*);
 static void lin_char_dispatch(alt_u8*);
 static void lin_message_dispatch(LIN_MESSAGE*);
+
+/* Helper Funtions */
+
+/******************************************************************************
+*
+* Name
+* ************
+* static void center_str
+*
+*
+* Description
+* *************
+* A helper function for center_string. Its purpose is to center ONE line of
+* text. The center_string function calls this function twice in order to center
+* both lines. This function only centers up to the newline character.
+* 
+* 
+* Ex: 
+* Input = "Testing\n123"
+* Output = "    Testing\n123"
+*
+* Parameters
+* *************
+* Name Type In/Out Description
+* ----------- ---------- --------------- ---------------
+* msg alt_u8* In The 8-bit pointer to the string of which to center
+*
+* Returns
+* *************
+* Type Description
+* ---------- ---------------
+* N/A
+*
+*
+******************************************************************************
+*/
+static void center_str(alt_u8 *input, alt_u8 *output);
