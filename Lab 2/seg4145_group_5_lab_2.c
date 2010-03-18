@@ -36,10 +36,15 @@ LIN_MESSAGE global_lin_message;
 volatile alt_u16 global_lin_char_current = 0;
 volatile alt_u16 global_lin_char_next = 0;
 
+/* Counters used to capture the current location */
 volatile int counter_left = 0;
 volatile int counter_right = 0;
 volatile int reply_left = 0;
 volatile int reply_right = 0;
+
+/* Variables used to calculate the side/angle length */
+double sideLength = 0.0, radious = 0.0;
+int wheelTurns[] = {0,0};// nimber of turns per wheel, L-R,
 
 int main()
 {
@@ -236,6 +241,29 @@ static void center_str(alt_u8 *input, alt_u8 *output)
         *output = input[i];
     }
 }
+
+ /**
+  * Finds all the internal angles of the polygone.
+  */
+static void calculateAngles(int numberOfSides, int *angles)
+{
+    // first find the angle between each secants
+    *angles[0] = 360 / numberOfSides;
+    // get the side angles
+    *angles[1] = 180 - *angles[0];
+} // end of Calculate Angles
+
+/**
+ * Finds the length of each side of the polygone.
+ */
+static int calculateSideLength(int radius, int *angles)
+{
+    // here is the calculus for side length.
+    int sideLength = radius / sin( (*angles[1] / 2)* PI/180 );
+    sideLength *= sin(*angles[0] * PI/180);
+
+    return sideLength;
+} // end of Calculate Side Length
 
 /* Used to handle the button presses based on the value
  * of edge_capture that had been previously set by the
