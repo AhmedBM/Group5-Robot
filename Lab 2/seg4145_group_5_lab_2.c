@@ -242,17 +242,11 @@ static void center_str(alt_u8 *input, alt_u8 *output)
     }
 }
 
- /**
-  * Finds the angle (in degrees) of the turn to be performed by the robot.
-  */
 static float calculateAngles(int numberOfSides)
 {
     return 360 / (float)numberOfSides;
 } // end calculateAngles
 
-/**
- * Finds the length of side to be manuvered by the robot.
- */
 static float calculateSideLength(int numberOfSides, int radius)
 {
 	int innerAngle = calculateAngles(numberOfSides);

@@ -134,8 +134,70 @@ static alt_u8 hex_to_dec(alt_u8 hex);
 */
 static alt_u8 *center_string(alt_u8 * msg);
 
+/******************************************************************************
+*
+* Name
+* ************
+* float calculateAngles
+*
+*
+* Description
+* *************
+* Calculates the interior angle of the polygone in addition to the angle to
+* turn the robot (it is the same angle).
+* 
+* Ex: 
+* Input = 8
+* Output = 45f (in degrees)
+*
+* Parameters
+* *************
+* Name Type In/Out Description
+* ----------- ---------- --------------- ---------------
+* numberOfSides int In The number of side the polygone has
+*
+* Returns
+* *************
+* Type Description
+* ---------- ---------------
+* float The interior angle of the polygone
+*
+*
+******************************************************************************
+*/
 static float calculateAngles(int numberOfSides);
 
+/******************************************************************************
+*
+* Name
+* ************
+* float calculateSideLength
+*
+*
+* Description
+* *************
+* Calculates the length of the side the robot has to manuver
+* 
+* Ex: 
+* Input = 8, 5
+* Output = 3.8268f
+*
+* Parameters
+* *************
+* Name Type In/Out Description
+* ----------- ---------- --------------- ---------------
+* numberOfSides int In The number of side the polygone has
+* radius int In The radius of the circle to perform
+*
+* Returns
+* *************
+* Type Description
+* ---------- ---------------
+* float The length of the side
+*
+*
+******************************************************************************
+*/
 static float calculateSideLength(int numberOfSides, int radius);
 
 /* LCD Related Prototype */
