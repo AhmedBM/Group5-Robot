@@ -6,7 +6,7 @@
  * Course Code:     SEG4145
  * Lab Number:      2
  * File name:       seg4145_group_5_lab_2.c
- * Date:        Febuary 3rd, 2010
+ * Date:        	March 19th, 2010
  *
  *
  * Description
@@ -908,7 +908,7 @@ static void lin_pwm_rotate_cw()
     int loc = 0;
     do
     {
-        lin_dig_in_read_left_counter();
+        lin_dig_in_read_counters();
         sprintf(buffer, "counter_left=%d", counter_left);
         displayMsgLCD(buffer);
         usleep(40000);
@@ -930,7 +930,7 @@ static void lin_pwm_rotate_ccw()
 
 /* Reads the current counter value */
 
-static void lin_dig_in_read_counter()
+static void lin_dig_in_read_counters()
 {   
   char message[6];
     
