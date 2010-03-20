@@ -400,8 +400,36 @@ static void lin_pwm_move_backward();
 static void lin_pwm_rotate_cw();
 static void lin_pwm_rotate_ccw();
 
-static void lin_dig_in_reset_counters();
+/******************************************************************************
+*
+* Name
+* ************
+* static void lin_dig_in_read_counters
+*
+*
+* Description
+* *************
+* This function sends two Read Module packets and waits for its replies after
+* which both the counter_left and counter_right counters are updated with the
+* latest counter values.
+*
+* Parameters
+* *************
+* Name Type In/Out Description
+* ----------- ---------- --------------- ---------------
+* N/A
+*
+* Returns
+* *************
+* Type Description
+* ---------- ---------------
+* N/A
+*
+******************************************************************************
+*/
 static void lin_dig_in_read_counters();
+
+static void lin_dig_in_reset_counters();
 static void lin_dig_in_enable_hsi();
 static void lin_dig_in_subscribe();
 
