@@ -245,25 +245,19 @@ static void center_str(alt_u8 *input, alt_u8 *output)
  /**
   * Finds all the internal angles of the polygone.
   */
-static void calculateAngles(int numberOfSides, int *angles)
+static int calculateAngles(int numberOfSides)
 {
-    // first find the angle between each secants
-    *angles[0] = 360 / numberOfSides;
-    // get the side angles
-    *angles[1] = 180 - *angles[0];
-} // end of Calculate Angles
+    return 360.0 / (double)numberOfSides;
+} // end calculateAngles
 
 /**
- * Finds the length of each side of the polygone.
+ * Finds the length of the turn to be performed by the robot.
  */
-static int calculateSideLength(int radius, int *angles)
+static int calculateSideLength(int numberOfSides, int radius)
 {
-    // here is the calculus for side length.
-    int sideLength = radius / sin( (*angles[1] / 2)* PI/180 );
-    sideLength *= sin(*angles[0] * PI/180);
-
-    return sideLength;
-} // end of Calculate Side Length
+	int innerAngle = calculateAngles(numberOfSides);
+    return (radius*sin(innerAngle*(PI/180))) / sin((180-innerAngle)*(PI/2));
+} // end calculateSideLength
 
 /* Used to handle the button presses based on the value
  * of edge_capture that had been previously set by the

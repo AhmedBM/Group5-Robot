@@ -134,9 +134,9 @@ static alt_u8 hex_to_dec(alt_u8 hex);
 */
 static alt_u8 *center_string(alt_u8 * msg);
 
-static void calculateAngles(int numberOfSides, int *angles);
+static int calculateAngles(int numberOfSides);
 
-static int calculateSideLength(int radius, int *angles);
+static int calculateSideLength(int numberOfSides, int radius);
 
 /* LCD Related Prototype */
 
@@ -339,7 +339,7 @@ static void lin_pwm_rotate_cw();
 static void lin_pwm_rotate_ccw();
 
 static void lin_dig_in_reset_counters();
-static void lin_dig_in_read_left_counter();
+static void lin_dig_in_read_counters();
 static void lin_dig_in_enable_hsi();
 static void lin_dig_in_subscribe();
 
