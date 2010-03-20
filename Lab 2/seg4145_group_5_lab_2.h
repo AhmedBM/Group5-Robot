@@ -134,9 +134,9 @@ static alt_u8 hex_to_dec(alt_u8 hex);
 */
 static alt_u8 *center_string(alt_u8 * msg);
 
-static int calculateAngles(int numberOfSides);
+static float calculateAngles(int numberOfSides);
 
-static int calculateSideLength(int numberOfSides, int radius);
+static float calculateSideLength(int numberOfSides, int radius);
 
 /* LCD Related Prototype */
 

@@ -243,20 +243,20 @@ static void center_str(alt_u8 *input, alt_u8 *output)
 }
 
  /**
-  * Finds all the internal angles of the polygone.
+  * Finds the angle (in degrees) of the turn to be performed by the robot.
   */
-static int calculateAngles(int numberOfSides)
+static float calculateAngles(int numberOfSides)
 {
-    return 360.0 / (double)numberOfSides;
+    return 360 / (float)numberOfSides;
 } // end calculateAngles
 
 /**
- * Finds the length of the turn to be performed by the robot.
+ * Finds the length of side to be manuvered by the robot.
  */
-static int calculateSideLength(int numberOfSides, int radius)
+static float calculateSideLength(int numberOfSides, int radius)
 {
 	int innerAngle = calculateAngles(numberOfSides);
-    return (radius*sin(innerAngle*(PI/180))) / sin((180-innerAngle)*(PI/2));
+    return (float)(radius*sin(innerAngle*(PI/180))) / (float)sin((180-innerAngle)*(PI/2));
 } // end calculateSideLength
 
 /* Used to handle the button presses based on the value
