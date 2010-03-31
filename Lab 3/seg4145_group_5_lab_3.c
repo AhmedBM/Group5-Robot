@@ -28,7 +28,14 @@ volatile int edge_capture;
 /* Declare a global variable to control the button presses
 * Used in handle_button_press to control which buttons are allowed to execute
 */
-volatile int mode;
+static int mode;
+
+volatile int direction;
+
+
+/* Declare a global variable to control the current radius index */
+volatile int radiusIndex;
+static int radiusLength[] = {2,3,4};
 
 alt_u8 global_lin_char_queue[LIN_CHAR_QUEUE_SIZE];
 LIN_MESSAGE global_lin_message;
@@ -49,6 +56,7 @@ int wheelTurns[] = {0,0};// nimber of turns per wheel, L-R,
 int main()
 {
 	int count = 0;
+    radiusIndex = 0;
 
 	/* Initialize the push button pio and enable interrupts for 
 	* the push buttons */
@@ -268,12 +276,14 @@ static void handle_button_press()
 		/************************************/
 		if (mode)
 		{
-			// Mode 2   
+			// Mode 2
+            // Increase Radius
+            radiusIndex = ++radiusIndex % (sizeof(radiusLength)/sizeof(int*));
 		}
 		else
 		{
 			// Mode 1
-			lin_pwm_move_forward(1);
+			lin_pwm_move_forward(radiusLength[radiusIndex]);
 		}
 		/***********************************/
 		edge_capture = 0;
@@ -302,7 +312,8 @@ static void handle_button_press()
 		/************************************/
 		if (mode)
 		{
-			// Mode 2   
+			// Mode 2
+            perform_circle(10);
 		}
 		else
 		{
@@ -332,6 +343,8 @@ static void handle_button_press()
 		edge_capture = 0;
 		break;
 	}
+    lin_led_set(VAL_LED_ALL_OFF);
+    usleep(500000);
 }
 
 /* Displays a string on the LCD display. */
@@ -490,7 +503,7 @@ static void send_message_to_uart(alt_u8 uart_no, alt_u8* message)
 #endif
 
 			IOWR_FE_UART_TXDATA(uart_base, message[i]);
-			usleep(5000);
+			usleep(1000);
 		}
 #ifdef DEBUG_UART_XMIT
 		printf("\n");
@@ -782,15 +795,15 @@ static void lin_pwm_full_stop()
 	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
 	message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
 
-	send_message_to_uart(UART1, message);   
+	send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
+
+    send_message_to_uart(UART1, message);   
 
 	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
 	message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_L;
-
-	send_message_to_uart(UART1, message);   
-
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
 
 	send_message_to_uart(UART1, message);   
 
@@ -806,6 +819,8 @@ static void lin_pwm_full_stop()
 
 static void lin_pwm_move_forward(int numTiles)
 {
+    lin_led_set(VAL_LED_MOVING_FORWARD);
+    
 	char message[7];
 
 	memset(message, '\0', 7);
@@ -833,20 +848,22 @@ static void lin_pwm_move_forward(int numTiles)
 	send_message_to_uart(UART1, message);
 
     // Self Correct wheel
-    lin_dig_in_read_counters();
-    self_correct_wheel();
+//    lin_dig_in_read_counters();
+//    self_correct_wheel();
 
 	char buffer[16];
-    int loc = 0;
+    int locLeft = 0;
     do
     {
-        loc += counter_left;
+        locLeft += counter_left;
+        
         lin_dig_in_reset_counters();
         lin_dig_in_read_counters();
-        sprintf(buffer, "loc=%d", loc);
+        
+        sprintf(buffer, "locLeft=%d", locLeft);
         displayMsgLCD(buffer);
-        usleep(10000);
-    }while(loc < (numTiles * SLICES_PER_TILE));
+        usleep(20000);
+    }while(locLeft < (numTiles * SLICES_PER_TILE));
 
     lin_pwm_full_stop();
 }
@@ -880,7 +897,7 @@ static void self_correct_wheel()
         
         do{
            lin_dig_in_read_counters();
-        }while(counter_right < counter_left);
+        }while(counter_right < counter_left-2);
         
         // Resume left wheel
         message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
@@ -892,7 +909,7 @@ static void self_correct_wheel()
         message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_L;
         send_message_to_uart(UART1, message);
     }
-    else if(counter_right > counter_left)
+    else if (counter_left < counter_right)
     {
         // correct left wheel - stop right wheel
         message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
@@ -907,7 +924,7 @@ static void self_correct_wheel()
         
         do{
            lin_dig_in_read_counters();
-        }while(counter_left < counter_right);
+        }while(counter_left < counter_right-2);
         
         // Resume right wheel
         message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
@@ -927,8 +944,10 @@ static void self_correct_wheel()
 * moving backwards.
 */
 
-static void lin_pwm_move_backward()
+static void lin_pwm_move_backward(int numTiles)
 {
+    lin_led_set(VAL_LED_MOVING_BACKWARD);
+    
 	char message[7];
 
 	memset(message, '\0', 7);
@@ -954,7 +973,21 @@ static void lin_pwm_move_backward()
 	message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_BACKWARD_L;
 	send_message_to_uart(UART1, message);
 
-	usleep(1800000);
+	char buffer[16];
+    int locLeft = 0;
+    do
+    {
+        locLeft += counter_left;
+        
+        lin_dig_in_reset_counters();
+        lin_dig_in_read_counters();
+        
+        sprintf(buffer, "locLeft=%d", locLeft);
+        displayMsgLCD(buffer);
+        usleep(20000);
+    }while(locLeft < (numTiles * SLICES_PER_TILE));
+
+    lin_pwm_full_stop();
 
 }
 
@@ -964,6 +997,7 @@ static void lin_pwm_move_backward()
 
 static void lin_pwm_rotate_cw(int degrees)
 {
+    lin_led_set(VAL_LED_TURNING_CW);
 	lin_pwm_rotate(degrees);
 }
 
@@ -1031,6 +1065,7 @@ static void lin_pwm_rotate(int degrees)
 
 static void lin_pwm_rotate_ccw(int degrees)
 {
+    lin_led_set(VAL_LED_TURNING_CCW);
 	lin_pwm_rotate(degrees * -1);
 }
 
@@ -1046,11 +1081,11 @@ static void lin_dig_in_read_counters()
 	message[MSG_F_LENGTH]     = 5;
 	message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
 	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_RIGHT_WHEEL;;
+	message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_RIGHT_WHEEL;
 
 	send_message_to_uart(UART1, message);
 
-	message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_LEFT_WHEEL;;
+	message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_LEFT_WHEEL;
 	send_message_to_uart(UART1, message);
 
     // Check reply
@@ -1173,4 +1208,38 @@ static void lin_uart_send_message(alt_u8 *msg)
 	for (i = 0; i < strlen(msg); i++)
 
 		send_message_to_uart(UART1, message);
+}
+
+static void perform_circle(int numberOfSides)
+{
+    float length = calculateSideLength(numberOfSides, radiusLength[radiusIndex]);
+    float angle = calculateAngles(numberOfSides);
+    
+    // Move current radius
+    lin_pwm_move_forward(radiusLength[radiusIndex]);
+    
+    // Turn 90 Degrees
+    lin_pwm_rotate_cw(90);
+    
+    // Move half a tile
+    lin_pwm_move_forward(length/2);
+    
+    int i = 0;
+    for(; i < numberOfSides-1; i++)
+    {
+        // Turn
+        lin_pwm_rotate_cw(angle);
+        
+        // Move Forward
+        lin_pwm_move_forward(length);
+    }
+    
+    // Move half a tile
+    lin_pwm_move_forward(length/2);
+    
+    // Turn 90 Degrees
+    lin_pwm_rotate_cw(90);
+    
+    // Move current radius
+    lin_pwm_move_forward(radiusLength[radiusIndex]);
 }

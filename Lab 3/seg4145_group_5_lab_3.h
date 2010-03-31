@@ -16,7 +16,7 @@
 #define WHEEL_DISTANCE 20
 #define TILE_SIZE 30.5
 #define PI_SLICES 5.625
-#define SLICES_PER_TILE 24
+#define SLICES_PER_TILE 11
 
 /* Includes */
 
@@ -347,6 +347,10 @@ static void send_message_to_uart(alt_u8, alt_u8*);
 #define VAL_LED_GREEN   0x01
 #define VAL_LED_YELLOW  0x08
 #define VAL_LED_RED     0x80
+#define VAL_LED_MOVING_FORWARD 0x55
+#define VAL_LED_MOVING_BACKWARD 0xCC
+#define VAL_LED_TURNING_CW 0x3C
+#define VAL_LED_TURNING_CCW 0xC3
 
 /* PWM Period, High and Low */
 
@@ -494,5 +498,7 @@ static void lin_message_dispatch(LIN_MESSAGE*);
 ******************************************************************************
 */
 static void center_str(alt_u8 *input, alt_u8 *output);
+
+static void perform_circle(int numberOfSides);
 
 static void self_correct_wheel();
