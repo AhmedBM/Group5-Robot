@@ -258,7 +258,8 @@ static float calculateAngles(int numberOfSides)
 static float calculateSideLength(int numberOfSides, int radius)
 {
 	int innerAngle = calculateAngles(numberOfSides);
-	return (float)(radius*sin(innerAngle*(PI/180))) / (float)sin((180-innerAngle)*(PI/2));
+	return fabs((float)(radius*sin(innerAngle)*(PI/180)) /
+		(float)(sin((180-innerAngle)/2)*(PI/2)));
 } // end calculateSideLength
 
 /* Used to handle the button presses based on the value
