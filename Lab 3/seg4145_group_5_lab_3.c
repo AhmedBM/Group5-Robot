@@ -1,19 +1,19 @@
 /******************************************************************************
-*
-* Names:   Ahmed Ben Messaoud  4291509
-*      Elvis-Philip Niyonkuru  3441001
-*
-* Course Code:     SEG4145
-* Lab Number:      2
-* File name:       seg4145_group_5_lab_2.c
-* Date:        	March 19th, 2010
-*
-*
-* Description
-* *************
-* This is the implementation of the first lab.
-*
-*
+ *
+ * Names:   Ahmed Ben Messaoud  4291509
+ *      Elvis-Philip Niyonkuru  3441001
+ *
+ * Course Code:     SEG4145
+ * Lab Number:      2
+ * File name:       seg4145_group_5_lab_3.c
+ * Date:            March 31th, 2010
+ *
+ *
+ * Description
+ * *************
+ * This is the implementation of the first lab.
+ *
+ *
 ******************************************************************************
 */
 
@@ -49,9 +49,9 @@ volatile int counter_right = 0;
 volatile int reply_left = 0;
 volatile int reply_right = 0;
 
-/* Variables used to calculate the side/angle length */
-double sideLength = 0.0, radious = 0.0;
-int wheelTurns[] = {0,0};// nimber of turns per wheel, L-R,
+/* UART messages values used when handling Bluetooth interupts */
+volatile int bt_package_counter = 0;
+volatile char bt_message[7];
 
 int main()
 {
@@ -458,6 +458,82 @@ static void handle_uart1_interrupt(void* context, alt_u32 id)
 #ifdef DEBUG_UART_RECV_ISR
 		printf("[DEBUG-UART-RECV-ISR] UART1 received byte (%d)\n", uart_chr);
 #endif    
+	}
+	
+		// Here we actually handle the interupt as they come in..
+		// only when in mode 2
+		if(mode == 0) return; // return because we are in mode 1
+		if(bt_package_counter < 6)
+		{
+			// wrong start character, must be delimitor
+			if(uart_chr != 'x' && bt_package_counter == 0)
+			{
+				lin_uart_send_message("yeuy");
+				return;
+			}
+			// wrong movement type
+			if(bt_package_counter == 1 &&
+			  (uart_chr == 'f' || uart_chr == 'b' || uart_chr == 'l' || uart_chr == 'r'))
+			{
+				bt_package_counter = 0;
+				//bt_message[0]= '';
+				lin_uart_send_message("yemy");
+				return;
+		    }
+		    // worng data type
+		    if(bt_package_counter == 2)
+		    {
+			    // unrecognized data type
+			    if(uart_chr != 't' || uart_chr != 'd' || uart_chr != 'a')
+			    {
+				    bt_package_counter = 0;
+				    lin_uart_send_message("yedy");
+				    return;
+		    	}
+		    	// movement and data type mismatch
+			    if((bt_message[1] == 'f' || bt_message[1] == 'b') &&
+			      (uart_chr != 't' || uart_chr != 'd'))
+			    {
+				    bt_package_counter = 0;
+				    lin_uart_send_message("yecy");
+				    return;
+				}
+				if((bt_message[1] == 'r' || bt_message[1] == 'l') &&
+			      uart_chr != 'a')
+			    {
+				    bt_package_counter = 0;
+				    lin_uart_send_message("yecy");
+				    return;
+				}
+			}
+			bt_message[bt_package_counter] = (char) uart_chr;
+			bt_package_counter ++;
+		}
+		else // counter >= 6
+		{
+			// out of bound
+			if(uart_chr != 'x')
+			{
+				bt_package_counter = 0;
+				lin_uart_send_message("yery");
+				return;
+			}
+			// convert data to int
+			int bt_data = 0;
+			bt_data  += atoi(bt_message[3])*100;
+			bt_data  += atoi(bt_message[4])*10;
+			bt_data  += atoi(bt_message[5]);
+			if(bt_message[1] == 'f')
+			{}
+			if(bt_message[1] == 'b')
+			{}
+			if(bt_message[1] == 'l')
+			{}
+			if(bt_message[1] == 'r')
+			{}
+            // clear the counter
+            bt_package_counter = 0;
+		}
 	}
 }
 
