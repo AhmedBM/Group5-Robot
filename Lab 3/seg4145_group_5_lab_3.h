@@ -16,7 +16,8 @@
 #define WHEEL_DISTANCE 20
 #define TILE_SIZE 30.5
 #define PI_SLICES 5.625
-#define SLICES_PER_TILE 11
+#define SLICES_PER_TILE 48
+#define DEGREE_PER_SLICE 0.5
 
 /* Includes */
 
@@ -32,6 +33,7 @@
 
 /* Debugging Constants */
 
+#define DEBUG_SENSOR 1
 #undef DEBUG_CHAR_DISPATCH
 #define DEBUG_MESSAGE_DISPATCH 1
 
@@ -404,11 +406,11 @@ static void lin_led_set(alt_u8);
 
 static void lin_pwm_init_period();
 static void lin_pwm_full_stop();
-static void lin_pwm_move_forward(int numTiles);
+static void lin_pwm_move_forward(float numTiles);
 static void lin_pwm_move_backward();
-static void lin_pwm_rotate_cw(int degrees);
-static void lin_pwm_rotate_ccw(int degrees);
-static void lin_pwm_rotate(int degrees);
+static void lin_pwm_rotate_cw(float degrees);
+static void lin_pwm_rotate_ccw(float degrees);
+static void lin_pwm_rotate(float degrees);
 
 /******************************************************************************
 *

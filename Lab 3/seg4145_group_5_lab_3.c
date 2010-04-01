@@ -90,8 +90,7 @@ int main()
 	sevenseg_set_hex(0);
 
 	// msg to send
-	alt_u8 msg[] = "3441001\n4291509";
-	displayMsgLCD(msg);
+	displayMsgLCD("Stopped");
 
 	while (1) {
 		if (global_lin_char_current != global_lin_char_next) {
@@ -258,8 +257,8 @@ static float calculateAngles(int numberOfSides)
 static float calculateSideLength(int numberOfSides, int radius)
 {
 	int innerAngle = calculateAngles(numberOfSides);
-	return fabs((float)(radius*sin(innerAngle)*(PI/180)) /
-		(float)(sin((180-innerAngle)/2)*(PI/2)));
+	return fabs((radius*sin(innerAngle*(PI/180))) /
+        (sin(((180-innerAngle)*(PI/180))/2)));
 } // end calculateSideLength
 
 /* Used to handle the button presses based on the value
@@ -285,7 +284,9 @@ static void handle_button_press()
 		{
 			// Mode 1
 			lin_pwm_move_forward(radiusLength[radiusIndex]);
+            displayMsgLCD("Stopped");
 		}
+        
 		/***********************************/
 		edge_capture = 0;
 		break;
@@ -298,6 +299,7 @@ static void handle_button_press()
 		{
 			// Mode 2
 			lin_pwm_rotate_ccw(90);
+            displayMsgLCD("Stopped");
 		}
 		else
 		{
@@ -315,11 +317,13 @@ static void handle_button_press()
 		{
 			// Mode 2
             perform_circle(10);
+            displayMsgLCD("Stopped");
 		}
 		else
 		{
 			// Mode 1
 			lin_pwm_rotate_cw(90);
+            displayMsgLCD("Stopped");
 		}
 		/************************************/
 		edge_capture = 0;
@@ -344,8 +348,7 @@ static void handle_button_press()
 		edge_capture = 0;
 		break;
 	}
-    lin_led_set(VAL_LED_ALL_OFF);
-    usleep(500000);
+    usleep(10000);
 }
 
 /* Displays a string on the LCD display. */
@@ -581,6 +584,7 @@ static void lin_message_dispatch(LIN_MESSAGE *msg)
 			 counter_left = msg->message_data[MSG_F_DATA];
 			 reply_left = 1;
 		 }
+         /* Right Wheel Value */
 		 else if (msg->message_data[MSG_F_REG_NO] == NAME_RIGHT_WHEEL)
 		 {
 			 counter_right = msg->message_data[MSG_F_DATA];
@@ -818,9 +822,10 @@ static void lin_pwm_full_stop()
 * moving forward.
 */
 
-static void lin_pwm_move_forward(int numTiles)
+static void lin_pwm_move_forward(float numTiles)
 {
     lin_led_set(VAL_LED_MOVING_FORWARD);
+    displayMsgLCD("Moving FWD");
     
 	char message[7];
 
@@ -853,18 +858,17 @@ static void lin_pwm_move_forward(int numTiles)
 //    self_correct_wheel();
 
 	char buffer[16];
-    int locLeft = 0;
     do
     {
-        locLeft += counter_left;
-        
-        lin_dig_in_reset_counters();
         lin_dig_in_read_counters();
         
-        sprintf(buffer, "locLeft=%d", locLeft);
+#ifdef DEBUG_CHAR_DISPATCH
+        sprintf(buffer, "counter_left=%d", counter_left);
+#endif
+
         displayMsgLCD(buffer);
-        usleep(20000);
-    }while(locLeft < (numTiles * SLICES_PER_TILE));
+        usleep(30000);
+    }while(counter_left < (numTiles * SLICES_PER_TILE));
 
     lin_pwm_full_stop();
 }
@@ -948,6 +952,7 @@ static void self_correct_wheel()
 static void lin_pwm_move_backward(int numTiles)
 {
     lin_led_set(VAL_LED_MOVING_BACKWARD);
+    displayMsgLCD("Moving BK");
     
 	char message[7];
 
@@ -983,9 +988,12 @@ static void lin_pwm_move_backward(int numTiles)
         lin_dig_in_reset_counters();
         lin_dig_in_read_counters();
         
-        sprintf(buffer, "locLeft=%d", locLeft);
+#ifdef DEBUG_CHAR_DISPATCH
+        sprintf(buffer, "counter_left=%d", counter_left);
+#endif
+
         displayMsgLCD(buffer);
-        usleep(20000);
+        usleep(30000);
     }while(locLeft < (numTiles * SLICES_PER_TILE));
 
     lin_pwm_full_stop();
@@ -996,13 +1004,14 @@ static void lin_pwm_move_backward(int numTiles)
 * rotating clockwise.
 */
 
-static void lin_pwm_rotate_cw(int degrees)
+static void lin_pwm_rotate_cw(float degrees)
 {
+    displayMsgLCD("Direction: CW");
     lin_led_set(VAL_LED_TURNING_CW);
 	lin_pwm_rotate(degrees);
 }
 
-static void lin_pwm_rotate(int degrees)
+static void lin_pwm_rotate(float degrees)
 {
     char message[7];
 
@@ -1048,24 +1057,28 @@ static void lin_pwm_rotate(int degrees)
     lin_dig_in_reset_counters();
 
     char buffer[16];
-    int loc = 0;
     do
     {
         lin_dig_in_read_counters();
+        
+#ifdef DEBUG_CHAR_DISPATCH
         sprintf(buffer, "counter_left=%d", counter_left);
-        displayMsgLCD(buffer);
-        usleep(20000);
-    }while(counter_left < (degrees / PI_SLICES));
+#endif
 
-    lin_pwm_full_stop();   
+        displayMsgLCD(buffer);
+        usleep(9000);
+    }while(counter_left < (degrees * DEGREE_PER_SLICE));
+
+    lin_pwm_full_stop();
 }
 
 /* Sends messages to the LIN such that the robot starts
 * rotating counterclockwise.
 */
 
-static void lin_pwm_rotate_ccw(int degrees)
+static void lin_pwm_rotate_ccw(float degrees)
 {
+    displayMsgLCD("Direction: CCW");
     lin_led_set(VAL_LED_TURNING_CCW);
 	lin_pwm_rotate(degrees * -1);
 }
@@ -1082,15 +1095,16 @@ static void lin_dig_in_read_counters()
 	message[MSG_F_LENGTH]     = 5;
 	message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
 	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_RIGHT_WHEEL;
-
-	send_message_to_uart(UART1, message);
+//	message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_RIGHT_WHEEL;
+//
+//	send_message_to_uart(UART1, message);
 
 	message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_LEFT_WHEEL;
 	send_message_to_uart(UART1, message);
 
     // Check reply
-	while(!reply_left && !reply_right)
+//	while(!reply_left && !reply_right)
+    while(!reply_left)
 	{
 		if (global_lin_char_current != global_lin_char_next) {
 #ifdef DEBUG_CHAR_DISPATCH
@@ -1102,9 +1116,9 @@ static void lin_dig_in_read_counters()
 			lin_char_dispatch(&global_lin_char_queue[global_lin_char_current]);
 		}
 	}
-
-	reply_left = 0;
-	reply_right = 0;
+    
+    reply_left = 0;
+    reply_right = 0;
 }
 
 /* Resets the counters of the Digital Inputs module. */
@@ -1223,7 +1237,7 @@ static void perform_circle(int numberOfSides)
     lin_pwm_rotate_cw(90);
     
     // Move half a tile
-    lin_pwm_move_forward(length/2);
+    lin_pwm_move_forward((length/2));
     
     int i = 0;
     for(; i < numberOfSides-1; i++)
