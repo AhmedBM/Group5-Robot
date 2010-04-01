@@ -1,10 +1,10 @@
 /******************************************************************************
  *
  * Names:   Ahmed Ben Messaoud  4291509
- *      Elvis-Philip Niyonkuru  3441001
+ *      	Elvis-Philip Niyonkuru  3441001
  *
  * Course Code:     SEG4145
- * Lab Number:      2
+ * Lab Number:      3
  * File name:       seg4145_group_5_lab_3.c
  * Date:            March 31th, 2010
  *
@@ -22,7 +22,6 @@
 /* Declare one global variable to capture the output of the buttons (SW0-SW3),
  * when they are pressed.
  */
-
 volatile int edge_capture;
 
 /* Declare a global variable to control the button presses
@@ -31,7 +30,6 @@ volatile int edge_capture;
 static int mode;
 
 volatile int direction;
-
 
 /* Declare a global variable to control the current radius index */
 volatile int radiusIndex;
@@ -54,7 +52,7 @@ volatile int bt_package_counter = 0;
 volatile char bt_message[7];
 
 int main()
-	{
+{
 	int count = 0;
 	radiusIndex = 0;
 	
@@ -458,6 +456,7 @@ static void handle_uart1_interrupt(void* context, alt_u32 id)
 		#ifdef DEBUG_UART_RECV_ISR
 		printf("[DEBUG-UART-RECV-ISR] UART1 received byte (%d)\n", uart_chr);
 		#endif
+		
 		// Here we actually handle the interupt as they come in..
 		// only when in mode 2
 		if(mode == 0) return; // return because we are in mode 1
@@ -529,6 +528,82 @@ static void handle_uart1_interrupt(void* context, alt_u32 id)
 			{}
 			if(bt_message[1] == 'r')
 			{}
+		}
+	}
+	
+		// Here we actually handle the interupt as they come in..
+		// only when in mode 2
+		if(mode == 0) return; // return because we are in mode 1
+		if(bt_package_counter < 6)
+		{
+			// wrong start character, must be delimitor
+			if(uart_chr != 'x' && bt_package_counter == 0)
+			{
+				lin_uart_send_message("yeuy");
+				return;
+			}
+			// wrong movement type
+			if(bt_package_counter == 1 &&
+			  (uart_chr == 'f' || uart_chr == 'b' || uart_chr == 'l' || uart_chr == 'r'))
+			{
+				bt_package_counter = 0;
+				//bt_message[0]= '';
+				lin_uart_send_message("yemy");
+				return;
+		    }
+		    // worng data type
+		    if(bt_package_counter == 2)
+		    {
+			    // unrecognized data type
+			    if(uart_chr != 't' || uart_chr != 'd' || uart_chr != 'a')
+			    {
+				    bt_package_counter = 0;
+				    lin_uart_send_message("yedy");
+				    return;
+		    	}
+		    	// movement and data type mismatch
+			    if((bt_message[1] == 'f' || bt_message[1] == 'b') &&
+			      (uart_chr != 't' || uart_chr != 'd'))
+			    {
+				    bt_package_counter = 0;
+				    lin_uart_send_message("yecy");
+				    return;
+				}
+				if((bt_message[1] == 'r' || bt_message[1] == 'l') &&
+			      uart_chr != 'a')
+			    {
+				    bt_package_counter = 0;
+				    lin_uart_send_message("yecy");
+				    return;
+				}
+			}
+			bt_message[bt_package_counter] = (char) uart_chr;
+			bt_package_counter ++;
+		}
+		else // counter >= 6
+		{
+			// out of bound
+			if(uart_chr != 'x')
+			{
+				bt_package_counter = 0;
+				lin_uart_send_message("yery");
+				return;
+			}
+			// convert data to int
+			int bt_data = 0;
+			bt_data  += atoi(bt_message[3])*100;
+			bt_data  += atoi(bt_message[4])*10;
+			bt_data  += atoi(bt_message[5]);
+			if(bt_message[1] == 'f')
+			{}
+			if(bt_message[1] == 'b')
+			{}
+			if(bt_message[1] == 'l')
+			{}
+			if(bt_message[1] == 'r')
+			{}
+            // clear the counter
+            bt_package_counter = 0;
 		}
 	}
 }
@@ -1291,9 +1366,11 @@ static void lin_uart_send_message(alt_u8 *msg)
 	message[MSG_F_MOD_TYPE]   = MOD_UART;
 	message[MSG_F_MOD_SERIAL] = 0x00;
 	message[MSG_F_REG_NO]     = VAL_UART_PORT_NO;
-	
-	for (i = 0; i < strlen(msg); i++)
-	  send_message_to_uart(UART1, message);
+
+  	for (i = 0; i < strlen(msg); i++)
+   		message[MSG_F_DATA + i] = msg[i];
+
+	send_message_to_uart(UART1, message);
 }
 
 static void perform_circle(int numberOfSides)
