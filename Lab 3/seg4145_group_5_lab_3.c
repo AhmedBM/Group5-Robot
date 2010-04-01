@@ -1220,9 +1220,10 @@ static void lin_uart_send_message(alt_u8 *msg)
 	message[MSG_F_MOD_SERIAL] = 0x00;
 	message[MSG_F_REG_NO]     = VAL_UART_PORT_NO;
 
-	for (i = 0; i < strlen(msg); i++)
+  	for (i = 0; i < strlen(msg); i++)
+   		message[MSG_F_DATA + i] = msg[i];
 
-		send_message_to_uart(UART1, message);
+	send_message_to_uart(UART1, message);
 }
 
 static void perform_circle(int numberOfSides)
