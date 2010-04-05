@@ -204,6 +204,37 @@ static float calculateAngles(int numberOfSides);
 */
 static float calculateSideLength(int numberOfSides, int radius);
 
+/******************************************************************************
+*
+* Name
+* ************
+* handle_bluetooth_char
+*
+*
+* Description
+* *************
+* Handles characters that are received over Bluetooth connection, then
+* reconstruct and invoke the command defined in protocol of the lab manual.
+*
+*
+* Parameters
+* *************
+* Name Type In/Out Description
+* ----------- ---------- --------------- ---------------
+* uart_chr alt_u8 In Character to be processed.
+*
+*
+* Returns
+* *************
+* Type Description
+* ---------- ---------------
+* void nothing to return.
+*
+*
+******************************************************************************
+*/
+static void handle_bluetooth_char(alt_u8 uart_chr);
+
 /* LCD Related Prototype */
 
 static void displayMsgLCD(alt_u8*);

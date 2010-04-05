@@ -259,6 +259,183 @@ static float calculateSideLength(int numberOfSides, int radius)
 		(sin(((180-innerAngle)*(PI/180))/2)));
 } // end calculateSideLength
 
+/**
+* Handles characters that are received over Bluetooth connection, then
+* reconstruct and invoke the command defined in protocol of the lab manual.
+*/
+static void handle_bluetooth_char(alt_u8 uart_chr)
+{
+	// only when in mode 2
+	if(mode == 0) return; // return because we are in mode 1
+	if(bt_package_counter < 6)
+	{
+		// wrong start character, must be delimitor
+		if(uart_char != 'x' && bt_package_counter == 0)
+		{
+			lin_uart_send_message("yeuy");
+			return;
+		}
+		// wrong movement type
+		if(bt_package_counter == 1 &&
+		(uart_chr == 'f' || uart_chr='b' || uart_chr == 'l' uart_chr == 'r'))
+		{
+			bt_package_counter = 0;
+			//bt_message[0]= '';
+			lin_uart_send_message("yemy");
+			return;
+	    }
+	    // worng data type
+	    if(bt_package_counter == 2)
+	    {
+		    // unrecognized data type
+		    if(uart_chr != 't' || uart_chr != 'd' || uart_chr != 'a')
+		    {
+			    bt_package_counter = 0;
+			    lin_uart_send_message("yedy");
+			    return;
+	    	}
+	    	// movement and data type mismatch
+		    if((bt_message[1] == 'f' || bt_message[1] == 'b') &&
+		      (uart_chr != 't' || uart_chr != 'd'))
+		    {
+			    bt_package_counter = 0;
+			    lin_uart_send_message("yecy");
+			    return;
+			}
+			if((bt_message[1] == 'r' || bt_message[1] == 'l') &&
+		      uart_chr != 'a')
+		    {
+			    bt_package_counter = 0;
+			    lin_uart_send_message("yecy");
+			    return;
+			}
+		}
+		bt_message[bt_package_counter] = (char) uart_chr;
+		bt_package_counter ++;
+	}
+	else // counter >= 6
+	{
+		// out of bound
+		if(uart_char != 'x')
+		{
+			bt_package_counter = 0;
+			lin_uart_send_message("yery");
+			return;
+		}
+		// convert data to int
+		int bt_data = 0;
+		bt_data  += atoi(bt_message[3])*100;
+		bt_data  += atoi(bt_message[4])*10;
+		bt_data  += atoi(bt_message[3]);
+		if(bt_message[1] == 'f')
+		{
+			if(bt_message[2] == 'd')
+			{
+				lin_pwm_move_forward(bt_data / TILE_SIZE);
+			}
+			else
+			{
+				lin_pwm_move_forward(bt_data);
+			}
+		}
+		if(bt_message[1] == 'b')
+		{
+			if(bt_message[2] == 'd')
+			{
+				lin_pwm_move_backward(bt_data / TILE_SIZE);
+			}
+			else
+			{
+				lin_pwm_move_backward(bt_data);
+			}
+		}
+		if(bt_message[1] == 'l')
+		{
+			lin_pwm_rotate_ccw(bt_data);
+		}
+		if(bt_message[1] == 'r')
+		{
+			lin_pwm_rotate_cw(bt_data);
+		}
+	}
+}
+
+	// Here we actually handle the interupt as they come in..
+	// only when in mode 2
+	if(mode == 0) return; // return because we are in mode 1
+	if(bt_package_counter < 6)
+	{
+		// wrong start character, must be delimitor
+		if(uart_chr != 'x' && bt_package_counter == 0)
+		{
+			lin_uart_send_message("yeuy");
+			return;
+		}
+		// wrong movement type
+		if(bt_package_counter == 1 &&
+		  (uart_chr == 'f' || uart_chr == 'b' || uart_chr == 'l' || uart_chr == 'r'))
+		{
+			bt_package_counter = 0;
+			//bt_message[0]= '';
+			lin_uart_send_message("yemy");
+			return;
+	    }
+	    // worng data type
+	    if(bt_package_counter == 2)
+	    {
+		    // unrecognized data type
+		    if(uart_chr != 't' || uart_chr != 'd' || uart_chr != 'a')
+		    {
+			    bt_package_counter = 0;
+			    lin_uart_send_message("yedy");
+			    return;
+	    	}
+	    	// movement and data type mismatch
+		    if((bt_message[1] == 'f' || bt_message[1] == 'b') &&
+		      (uart_chr != 't' || uart_chr != 'd'))
+		    {
+			    bt_package_counter = 0;
+			    lin_uart_send_message("yecy");
+			    return;
+			}
+			if((bt_message[1] == 'r' || bt_message[1] == 'l') &&
+		      uart_chr != 'a')
+		    {
+			    bt_package_counter = 0;
+			    lin_uart_send_message("yecy");
+			    return;
+			}
+		}
+		bt_message[bt_package_counter] = (char) uart_chr;
+		bt_package_counter ++;
+	}
+	else // counter >= 6
+	{
+		// out of bound
+		if(uart_chr != 'x')
+		{
+			bt_package_counter = 0;
+			lin_uart_send_message("yery");
+			return;
+		}
+		// convert data to int
+		int bt_data = 0;
+		bt_data  += atoi(bt_message[3])*100;
+		bt_data  += atoi(bt_message[4])*10;
+		bt_data  += atoi(bt_message[5]);
+		if(bt_message[1] == 'f')
+		{}
+		if(bt_message[1] == 'b')
+		{}
+		if(bt_message[1] == 'l')
+		{}
+		if(bt_message[1] == 'r')
+		{}
+        // clear the counter
+        bt_package_counter = 0;
+	}
+} // end of handle bluetooth char
+
 /* Used to handle the button presses based on the value
  * of edge_capture that had been previously set by the
  * button_pio interrupt handler.
@@ -458,153 +635,7 @@ static void handle_uart1_interrupt(void* context, alt_u32 id)
 		#endif
 		
 		// Here we actually handle the interupt as they come in..
-		// only when in mode 2
-		if(mode == 0) return; // return because we are in mode 1
-		if(bt_package_counter < 6)
-		{
-			// wrong start character, must be delimitor
-			if(uart_char != 'x' && bt_package_counter == 0)
-			{
-				lin_uart_send_message("yeuy");
-				return;
-			}
-			// wrong movement type
-			if(bt_package_counter == 1 &&
-			(uart_chr == 'f' || uart_chr='b' || uart_chr == 'l' uart_chr == 'r'))
-			{
-				bt_package_counter = 0;
-				//bt_message[0]= '';
-				lin_uart_send_message("yemy");
-				return;
-		    }
-		    // worng data type
-		    if(bt_package_counter == 2)
-		    {
-			    // unrecognized data type
-			    if(uart_chr != 't' || uart_chr != 'd' || uart_chr != 'a')
-			    {
-				    bt_package_counter = 0;
-				    lin_uart_send_message("yedy");
-				    return;
-		    	}
-		    	// movement and data type mismatch
-			    if((bt_message[1] == 'f' || bt_message[1] == 'b') &&
-			      (uart_chr != 't' || uart_chr != 'd'))
-			    {
-				    bt_package_counter = 0;
-				    lin_uart_send_message("yecy");
-				    return;
-				}
-				if((bt_message[1] == 'r' || bt_message[1] == 'r') &&
-			      uart_chr != 'a')
-			    {
-				    bt_package_counter = 0;
-				    lin_uart_send_message("yecy");
-				    return;
-				}
-			}
-			bt_message[bt_package_counter] = (char) uart_chr;
-			bt_package_counter ++;
-		}
-		else // counter >= 6
-		{
-			// out of bound
-			if(uart_char != 'x')
-			{
-				bt_package_counter = 0;
-				lin_uart_send_message("yery");
-				return;
-			}
-			// convert data to int
-			int bt_data = 0;
-			bt_data  += atoi(bt_message[3])*100;
-			bt_data  += atoi(bt_message[4])*10;
-			bt_data  += atoi(bt_message[3]);
-			if(bt_message[1] == 'f')
-			{}
-			if(bt_message[1] == 'b')
-			{}
-			if(bt_message[1] == 'l')
-			{}
-			if(bt_message[1] == 'r')
-			{}
-		}
-	}
-	
-		// Here we actually handle the interupt as they come in..
-		// only when in mode 2
-		if(mode == 0) return; // return because we are in mode 1
-		if(bt_package_counter < 6)
-		{
-			// wrong start character, must be delimitor
-			if(uart_chr != 'x' && bt_package_counter == 0)
-			{
-				lin_uart_send_message("yeuy");
-				return;
-			}
-			// wrong movement type
-			if(bt_package_counter == 1 &&
-			  (uart_chr == 'f' || uart_chr == 'b' || uart_chr == 'l' || uart_chr == 'r'))
-			{
-				bt_package_counter = 0;
-				//bt_message[0]= '';
-				lin_uart_send_message("yemy");
-				return;
-		    }
-		    // worng data type
-		    if(bt_package_counter == 2)
-		    {
-			    // unrecognized data type
-			    if(uart_chr != 't' || uart_chr != 'd' || uart_chr != 'a')
-			    {
-				    bt_package_counter = 0;
-				    lin_uart_send_message("yedy");
-				    return;
-		    	}
-		    	// movement and data type mismatch
-			    if((bt_message[1] == 'f' || bt_message[1] == 'b') &&
-			      (uart_chr != 't' || uart_chr != 'd'))
-			    {
-				    bt_package_counter = 0;
-				    lin_uart_send_message("yecy");
-				    return;
-				}
-				if((bt_message[1] == 'r' || bt_message[1] == 'l') &&
-			      uart_chr != 'a')
-			    {
-				    bt_package_counter = 0;
-				    lin_uart_send_message("yecy");
-				    return;
-				}
-			}
-			bt_message[bt_package_counter] = (char) uart_chr;
-			bt_package_counter ++;
-		}
-		else // counter >= 6
-		{
-			// out of bound
-			if(uart_chr != 'x')
-			{
-				bt_package_counter = 0;
-				lin_uart_send_message("yery");
-				return;
-			}
-			// convert data to int
-			int bt_data = 0;
-			bt_data  += atoi(bt_message[3])*100;
-			bt_data  += atoi(bt_message[4])*10;
-			bt_data  += atoi(bt_message[5]);
-			if(bt_message[1] == 'f')
-			{}
-			if(bt_message[1] == 'b')
-			{}
-			if(bt_message[1] == 'l')
-			{}
-			if(bt_message[1] == 'r')
-			{}
-            // clear the counter
-            bt_package_counter = 0;
-		}
+		handle_bluetooth_char(uart_chr);
 	}
 }
 
