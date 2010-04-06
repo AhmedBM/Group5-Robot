@@ -277,7 +277,7 @@ static void handle_bluetooth_char(alt_u8 uart_chr)
 		}
 		// wrong movement type
 		if(bt_package_counter == 1 &&
-		(uart_chr == 'f' || uart_chr='b' || uart_chr == 'l' uart_chr == 'r'))
+		!(uart_chr == 'f' || uart_chr =='b' || uart_chr == 'l' || uart_chr == 'r'))
 		{
 			bt_package_counter = 0;
 			//bt_message[0]= '';
@@ -357,6 +357,7 @@ static void handle_bluetooth_char(alt_u8 uart_chr)
 		{
 			lin_pwm_rotate_cw(bt_data);
 		}
+		bt_package_counter = 0;
 	}
 }
 
