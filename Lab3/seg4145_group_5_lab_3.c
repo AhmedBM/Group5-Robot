@@ -628,8 +628,7 @@ static void handle_uart1_interrupt(void* context, alt_u32 id)
 		/* Wrap around if we have hit the maximum size
 		* of the character circular buffer
 		*/
-		// not needed, as the interupt will be handel directly
-		//if (global_lin_char_next == LIN_CHAR_QUEUE_SIZE) global_lin_char_next = 0;
+		if (global_lin_char_next == LIN_CHAR_QUEUE_SIZE) global_lin_char_next = 0;
 		
 		#ifdef DEBUG_UART_RECV_ISR
 		printf("[DEBUG-UART-RECV-ISR] UART1 received byte (%d)\n", uart_chr);
