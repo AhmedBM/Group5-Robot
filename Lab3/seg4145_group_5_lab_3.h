@@ -2,6 +2,8 @@
 #define _LAB_TEMPLATE_H_
 #endif //_LAB_TEMPLATE_H_
 
+enum Operation { Forward=1, Backward, Clockwise, CounterClockwise};
+
 /* Defines */
 #define STUDENT1 4291509
 #define STUDENT2 3441001
@@ -203,37 +205,6 @@ static float calculateAngles(int numberOfSides);
 ******************************************************************************
 */
 static float calculateSideLength(int numberOfSides, int radius);
-
-/******************************************************************************
-*
-* Name
-* ************
-* handle_bluetooth_char
-*
-*
-* Description
-* *************
-* Handles characters that are received over Bluetooth connection, then
-* reconstruct and invoke the command defined in protocol of the lab manual.
-*
-*
-* Parameters
-* *************
-* Name Type In/Out Description
-* ----------- ---------- --------------- ---------------
-* uart_chr alt_u8 In Character to be processed.
-*
-*
-* Returns
-* *************
-* Type Description
-* ---------- ---------------
-* void nothing to return.
-*
-*
-******************************************************************************
-*/
-static void handle_bluetooth_char(alt_u8 uart_chr);
 
 /* LCD Related Prototype */
 
@@ -536,3 +507,5 @@ static void center_str(alt_u8 *input, alt_u8 *output);
 static void perform_circle(int numberOfSides);
 
 static void self_correct_wheel();
+
+static void handle_bluetooth_char(alt_u8 uart_chr);

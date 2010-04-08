@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Names:   Ahmed Ben Messaoud  4291509
- *      	Elvis-Philip Niyonkuru  3441001
+ *          Elvis-Philip Niyonkuru  3441001
  *
  * Course Code:     SEG4145
  * Lab Number:      3
@@ -50,213 +50,241 @@ volatile int reply_right = 0;
 /* UART messages values used when handling Bluetooth interupts */
 volatile int bt_package_counter = 0;
 volatile char bt_message[7];
+volatile int bt_data = 0;
+volatile int operation = 0;
 
 int main()
 {
-	int count = 0;
-	radiusIndex = 0;
-	
-	/* Initialize the push button pio and enable interrupts for 
-	 * the push buttons */
-	init_button_pio();
-	
-	/* Initialize the UART interrupt handler(s) */
-	init_uart(UART1);
-	
-	/* Initialize edge_capture to avoid any "false" triggers from
-	 * a previous run.
-	 */
-	edge_capture = 0;
-	
-	/* Initialize the global LIN character queue */
-	for (count = 0; count < LIN_CHAR_QUEUE_SIZE; count++)
-		global_lin_char_queue[count] = '\0';
-	
-	/* Initialize the global LIN message structure */
-	lin_message_init(&global_lin_message);
-	
-	/* Connect to the LIN */
-	lin_connect();
-	
-	// INSERT YOUR CODE BETWEEN THE TWO ROWS OF STARS
-	/*************************************************************/
-	
-	// Display pattern on LEDs
-	displayLED(0);
-	
-	// Display number onm the 7-segement
-	sevenseg_set_hex(0);
-	
-	// msg to send
-	alt_u8 msg[] = "3441001\n4291509";
-	displayMsgLCD(msg);
-	
-	while (1) {
-		if (global_lin_char_current != global_lin_char_next) {
-			#ifdef DEBUG_CHAR_DISPATCH
-			printf("[DEBUG-CHAR-DISPATCH] Dispatch condition hit: %d != %d\n",
-			global_lin_char_current, global_lin_char_next);
-			#endif
-			
-			/* Dispatch the outstanding character */
-			lin_char_dispatch(&global_lin_char_queue[global_lin_char_current]);
-		}
-		handle_button_press();
-	}
-	
-	/*************************************************************/
-	
-	return 0;
+    int count = 0;
+    radiusIndex = 0;
+    
+    /* Initialize the push button pio and enable interrupts for 
+     * the push buttons */
+    init_button_pio();
+    
+    /* Initialize the UART interrupt handler(s) */
+    init_uart(UART1);
+    
+    /* Initialize edge_capture to avoid any "false" triggers from
+     * a previous run.
+     */
+    edge_capture = 0;
+    
+    /* Initialize the global LIN character queue */
+    for (count = 0; count < LIN_CHAR_QUEUE_SIZE; count++)
+        global_lin_char_queue[count] = '\0';
+    
+    /* Initialize the global LIN message structure */
+    lin_message_init(&global_lin_message);
+    
+    /* Connect to the LIN */
+    lin_connect();
+    
+    // INSERT YOUR CODE BETWEEN THE TWO ROWS OF STARS
+    /*************************************************************/
+    
+    // Display pattern on LEDs
+    displayLED(0);
+    
+    // Display the mode on the 7-segement
+    sevenseg_set_hex(1);
+    
+    // msg to send
+    alt_u8 msg[] = "3441001\n4291509";
+    displayMsgLCD(msg);
+    
+    while (1) {
+        if (global_lin_char_current != global_lin_char_next) {
+            #ifdef DEBUG_CHAR_DISPATCH
+            printf("[DEBUG-CHAR-DISPATCH] Dispatch condition hit: %d != %d\n",
+            global_lin_char_current, global_lin_char_next);
+            #endif
+            
+            /* Dispatch the outstanding character */
+            lin_char_dispatch(&global_lin_char_queue[global_lin_char_current]);
+        }
+        if (operation > 0)
+        {
+            //Operation pending - perform it
+            switch(operation)
+            {
+                case Forward:
+                    lin_pwm_move_forward(bt_data);
+                    break;
+                case Backward:
+                    lin_pwm_move_backward(bt_data);
+                    break;
+                case Clockwise:
+                    lin_pwm_rotate_cw(bt_data);
+                    break;
+                case CounterClockwise:
+                    lin_pwm_rotate_ccw(bt_data);
+                    break;   
+            }
+            
+            // Confirm that it worked
+            lin_uart_send_message("yssy");
+            
+            // Reset operation and data
+            operation = 0;
+            bt_data = 0;
+        }
+        handle_button_press();
+    }
+    
+    /*************************************************************/
+    
+    return 0;
 }
 
 static alt_u8 reverse_bit_pattern(alt_u8 inByte)
 {
-	alt_u8 output = 0x00;
-	alt_u8 temp = 0x00;
-	alt_u8 bit = 0x01; // 0000 0001
-	
-	int i = 0;
-	for(; i < 8; i++)
-	{
-		output = output << 1; // shift to left
-		// get the bit at ith position
-		// and shit it to the far left
-		temp = (inByte & bit) >> i;
-		output = output | temp;
-		bit = bit << 1;
-	}
-	return output;
+    alt_u8 output = 0x00;
+    alt_u8 temp = 0x00;
+    alt_u8 bit = 0x01; // 0000 0001
+    
+    int i = 0;
+    for(; i < 8; i++)
+    {
+        output = output << 1; // shift to left
+        // get the bit at ith position
+        // and shit it to the far left
+        temp = (inByte & bit) >> i;
+        output = output | temp;
+        bit = bit << 1;
+    }
+    return output;
 }
 
 static alt_u8 hex_to_dec(alt_u8 hex)
 {
-	// check the hex against requirements (must be less then 100)
-	if (hex > MAXNUM) return 0;
-	alt_u8 lestSign = hex % BASE10;
-	alt_u8 mostSign = hex / BASE10;
-	mostSign = mostSign * BASE16;
-	return lestSign + mostSign;
+    // check the hex against requirements (must be less then 100)
+    if (hex > MAXNUM) return 0;
+    alt_u8 lestSign = hex % BASE10;
+    alt_u8 mostSign = hex / BASE10;
+    mostSign = mostSign * BASE16;
+    return lestSign + mostSign;
 }
 
 static alt_u8 *center_string(alt_u8 * msg)
 {
-	// 16 characters on two lines + 1 char for null or newline on every line
-	// NUMCHARACTERS is the number of characters per line
-	// NUMLINE the number of lines on teh LCD
-	// we add NUMLINES because every line has a control character, either
-	// being a newline or null char          
-	char *newStr = (char *)calloc(NUMCHARACTERS * NUMLINES + NUMLINES, sizeof(char));
-	
-	//was the memory allocated
-	if (newStr == NULL)
-	return NULL;
-	
-	int i = 0;
-	
-	alt_u8 *pLoc = strstr(msg, "\n");
-	
-	// Is the string longer than 14 chars?
-	// we do not need to center the string if it is only 1 char away from a full line
-	if (strlen(msg) >= NUMCHARACTERS-1)
-	{
-		// if there a newline in the string?
-		if (pLoc != NULL)
-		{
-			// There is a newline - is it further than 16 chars away?
-			if ((pLoc - msg) > NUMCHARACTERS)
-			{
-				// trim chars after 16 chars and add a newline, proceed with the rest of the string
-				// copy the chars
-				strncpy(newStr, msg, NUMCHARACTERS);
-				// add the newline
-				newStr[NUMCHARACTERS] = '\n';
-				
-				// center the rest of the string
-				center_str(pLoc+1, &newStr[NUMCHARACTERS+1]);
-			}
-			else
-			{
-				// center text before the newline
-				center_str(msg, newStr);
-				
-				// find the null char in the old string and the newline in the new string
-				char locNullChar = (char)strlen(newStr);    //using a char instead of int to save a byte
-				char *pLocNewLine = strstr(msg, "\n");
-				
-				// add newline to newStr
-				newStr[locNullChar] = '\n';
-				
-				//center the rest of the string
-				center_str(pLocNewLine+1, &newStr[locNullChar+1]);
-			}
-		}
-		else
-		{
-			// There is a no newline - trim characters away
-			// COPY chars into new one but trim after 16 chars
-			strncpy(newStr, msg, NUMCHARACTERS);
-		}
-	}
-	else
-	{
-		//is there a newline
-		if (pLoc != NULL)
-		{
-			// there is a newline, center the string - before the newline
-			center_str(msg, newStr);
-			
-			// add the newline to the new string - replace the null char with a newline
-			char locNullChar = strlen(newStr);  //using char instead of int to save a byte
-			newStr[(int)locNullChar] = '\n';
-			
-			//center the string - after the newline
-			center_str(pLoc+1, &newStr[locNullChar+1]);
-		}
-		else
-		{
-			// no newline, just center the string
-			center_str(msg, newStr);
-		}
-	}
-	return newStr;
+    // 16 characters on two lines + 1 char for null or newline on every line
+    // NUMCHARACTERS is the number of characters per line
+    // NUMLINE the number of lines on teh LCD
+    // we add NUMLINES because every line has a control character, either
+    // being a newline or null char          
+    char *newStr = (char *)calloc(NUMCHARACTERS * NUMLINES + NUMLINES, sizeof(char));
+    
+    //was the memory allocated
+    if (newStr == NULL)
+    return NULL;
+    
+    int i = 0;
+    
+    alt_u8 *pLoc = strstr(msg, "\n");
+    
+    // Is the string longer than 14 chars?
+    // we do not need to center the string if it is only 1 char away from a full line
+    if (strlen(msg) >= NUMCHARACTERS-1)
+    {
+        // if there a newline in the string?
+        if (pLoc != NULL)
+        {
+            // There is a newline - is it further than 16 chars away?
+            if ((pLoc - msg) > NUMCHARACTERS)
+            {
+                // trim chars after 16 chars and add a newline, proceed with the rest of the string
+                // copy the chars
+                strncpy(newStr, msg, NUMCHARACTERS);
+                // add the newline
+                newStr[NUMCHARACTERS] = '\n';
+                
+                // center the rest of the string
+                center_str(pLoc+1, &newStr[NUMCHARACTERS+1]);
+            }
+            else
+            {
+                // center text before the newline
+                center_str(msg, newStr);
+                
+                // find the null char in the old string and the newline in the new string
+                char locNullChar = (char)strlen(newStr);    //using a char instead of int to save a byte
+                char *pLocNewLine = strstr(msg, "\n");
+                
+                // add newline to newStr
+                newStr[locNullChar] = '\n';
+                
+                //center the rest of the string
+                center_str(pLocNewLine+1, &newStr[locNullChar+1]);
+            }
+        }
+        else
+        {
+            // There is a no newline - trim characters away
+            // COPY chars into new one but trim after 16 chars
+            strncpy(newStr, msg, NUMCHARACTERS);
+        }
+    }
+    else
+    {
+        //is there a newline
+        if (pLoc != NULL)
+        {
+            // there is a newline, center the string - before the newline
+            center_str(msg, newStr);
+            
+            // add the newline to the new string - replace the null char with a newline
+            char locNullChar = strlen(newStr);  //using char instead of int to save a byte
+            newStr[(int)locNullChar] = '\n';
+            
+            //center the string - after the newline
+            center_str(pLoc+1, &newStr[locNullChar+1]);
+        }
+        else
+        {
+            // no newline, just center the string
+            center_str(msg, newStr);
+        }
+    }
+    return newStr;
 }
 
 static void center_str(alt_u8 *input, alt_u8 *output)
 {
-	// How many spaces are needed? Cannot use string size as we must not include newline char
-	int size = 0;
-	while (input[size] != '\0')
-	{
-		if (input[size] == '\n')
-		break;
-		size++;
-	}
-	int spacesNeeded = (NUMCHARACTERS-size)/2;
-	
-	// Add spaces to output
-	int i=0;
-	for (i=0; i<spacesNeeded; i++, output++)
-	{
-		*output = ' ';
-	}
-	
-	// Add input text
-	for (i=0; i<size; i++, output++)
-	{
-		*output = input[i];
-	}
+    // How many spaces are needed? Cannot use string size as we must not include newline char
+    int size = 0;
+    while (input[size] != '\0')
+    {
+        if (input[size] == '\n')
+        break;
+        size++;
+    }
+    int spacesNeeded = (NUMCHARACTERS-size)/2;
+    
+    // Add spaces to output
+    int i=0;
+    for (i=0; i<spacesNeeded; i++, output++)
+    {
+        *output = ' ';
+    }
+    
+    // Add input text
+    for (i=0; i<size; i++, output++)
+    {
+        *output = input[i];
+    }
 }
 
 static float calculateAngles(int numberOfSides)
 {
-	return 360 / (float)numberOfSides;
+    return 360 / (float)numberOfSides;
 } // end calculateAngles
 
 static float calculateSideLength(int numberOfSides, int radius)
 {
-	int innerAngle = calculateAngles(numberOfSides);
-	return fabs((radius*sin(innerAngle*(PI/180))) /
-		(sin(((180-innerAngle)*(PI/180))/2)));
+    int innerAngle = calculateAngles(numberOfSides);
+    return fabs((radius*sin(innerAngle*(PI/180))) /
+        (sin(((180-innerAngle)*(PI/180))/2)));
 } // end calculateSideLength
 
 /**
@@ -265,176 +293,103 @@ static float calculateSideLength(int numberOfSides, int radius)
 */
 static void handle_bluetooth_char(alt_u8 uart_chr)
 {
-	// only when in mode 2
-	if(mode == 0) return; // return because we are in mode 1
-	if(bt_package_counter < 6)
-	{
-		// wrong start character, must be delimitor
-		if(uart_char != 'x' && bt_package_counter == 0)
-		{
-			lin_uart_send_message("yeuy");
-			return;
-		}
-		// wrong movement type
-		if(bt_package_counter == 1 &&
-		!(uart_chr == 'f' || uart_chr =='b' || uart_chr == 'l' || uart_chr == 'r'))
-		{
-			bt_package_counter = 0;
-			//bt_message[0]= '';
-			lin_uart_send_message("yemy");
-			return;
-	    }
-	    // worng data type
-	    if(bt_package_counter == 2)
-	    {
-		    // unrecognized data type
-		    if(uart_chr != 't' || uart_chr != 'd' || uart_chr != 'a')
-		    {
-			    bt_package_counter = 0;
-			    lin_uart_send_message("yedy");
-			    return;
-	    	}
-	    	// movement and data type mismatch
-		    if((bt_message[1] == 'f' || bt_message[1] == 'b') &&
-		      (uart_chr != 't' || uart_chr != 'd'))
-		    {
-			    bt_package_counter = 0;
-			    lin_uart_send_message("yecy");
-			    return;
-			}
-			if((bt_message[1] == 'r' || bt_message[1] == 'l') &&
-		      uart_chr != 'a')
-		    {
-			    bt_package_counter = 0;
-			    lin_uart_send_message("yecy");
-			    return;
-			}
-		}
-		bt_message[bt_package_counter] = (char) uart_chr;
-		bt_package_counter ++;
-	}
-	else // counter >= 6
-	{
-		// out of bound
-		if(uart_char != 'x')
-		{
-			bt_package_counter = 0;
-			lin_uart_send_message("yery");
-			return;
-		}
-		// convert data to int
-		int bt_data = 0;
-		bt_data  += atoi(bt_message[3])*100;
-		bt_data  += atoi(bt_message[4])*10;
-		bt_data  += atoi(bt_message[3]);
-		if(bt_message[1] == 'f')
-		{
-			if(bt_message[2] == 'd')
-			{
-				lin_pwm_move_forward(bt_data / TILE_SIZE);
-			}
-			else
-			{
-				lin_pwm_move_forward(bt_data);
-			}
-		}
-		if(bt_message[1] == 'b')
-		{
-			if(bt_message[2] == 'd')
-			{
-				lin_pwm_move_backward(bt_data / TILE_SIZE);
-			}
-			else
-			{
-				lin_pwm_move_backward(bt_data);
-			}
-		}
-		if(bt_message[1] == 'l')
-		{
-			lin_pwm_rotate_ccw(bt_data);
-		}
-		if(bt_message[1] == 'r')
-		{
-			lin_pwm_rotate_cw(bt_data);
-		}
-		bt_package_counter = 0;
-	}
-}
-
-	// Here we actually handle the interupt as they come in..
-	// only when in mode 2
-	if(mode == 0) return; // return because we are in mode 1
-	if(bt_package_counter < 6)
-	{
-		// wrong start character, must be delimitor
-		if(uart_chr != 'x' && bt_package_counter == 0)
-		{
-			lin_uart_send_message("yeuy");
-			return;
-		}
-		// wrong movement type
-		if(bt_package_counter == 1 &&
-		  (uart_chr == 'f' || uart_chr == 'b' || uart_chr == 'l' || uart_chr == 'r'))
-		{
-			bt_package_counter = 0;
-			//bt_message[0]= '';
-			lin_uart_send_message("yemy");
-			return;
-	    }
-	    // worng data type
-	    if(bt_package_counter == 2)
-	    {
-		    // unrecognized data type
-		    if(uart_chr != 't' || uart_chr != 'd' || uart_chr != 'a')
-		    {
-			    bt_package_counter = 0;
-			    lin_uart_send_message("yedy");
-			    return;
-	    	}
-	    	// movement and data type mismatch
-		    if((bt_message[1] == 'f' || bt_message[1] == 'b') &&
-		      (uart_chr != 't' || uart_chr != 'd'))
-		    {
-			    bt_package_counter = 0;
-			    lin_uart_send_message("yecy");
-			    return;
-			}
-			if((bt_message[1] == 'r' || bt_message[1] == 'l') &&
-		      uart_chr != 'a')
-		    {
-			    bt_package_counter = 0;
-			    lin_uart_send_message("yecy");
-			    return;
-			}
-		}
-		bt_message[bt_package_counter] = (char) uart_chr;
-		bt_package_counter ++;
-	}
-	else // counter >= 6
-	{
-		// out of bound
-		if(uart_chr != 'x')
-		{
-			bt_package_counter = 0;
-			lin_uart_send_message("yery");
-			return;
-		}
-		// convert data to int
-		int bt_data = 0;
-		bt_data  += atoi(bt_message[3])*100;
-		bt_data  += atoi(bt_message[4])*10;
-		bt_data  += atoi(bt_message[5]);
-		if(bt_message[1] == 'f')
-		{}
-		if(bt_message[1] == 'b')
-		{}
-		if(bt_message[1] == 'l')
-		{}
-		if(bt_message[1] == 'r')
-		{}
-        // clear the counter
+    // only when in mode 2
+    if(mode == 0) return; // return because we are in mode 1
+    if(bt_package_counter < 6)
+    {
+        // wrong start character, must be delimitor
+        if(uart_chr != 'x' && bt_package_counter == 0)
+        {
+            lin_uart_send_message("yeuy");
+            return;
+        }
+        // wrong movement type
+        if(bt_package_counter == 1 &&
+        !(uart_chr == 'f' || uart_chr =='b' || uart_chr == 'l' || uart_chr == 'r'))
+        {
+            bt_package_counter = 0;
+            //bt_message[0]= '';
+            lin_uart_send_message("yemy");
+            return;
+        }
+        // worng data type
+        if(bt_package_counter == 2)
+        {
+            // unrecognized data type
+            if(uart_chr != 't' && uart_chr != 'd' && uart_chr != 'a')
+            {
+                bt_package_counter = 0;
+                lin_uart_send_message("yedy");
+                return;
+            }
+            // movement and data type mismatch
+            if((bt_message[1] == 'f' || bt_message[1] == 'b') &&
+              (uart_chr != 't' && uart_chr != 'd'))
+            {
+                bt_package_counter = 0;
+                lin_uart_send_message("yecy");
+                return;
+            }
+            else if((bt_message[1] == 'r' || bt_message[1] == 'l') &&
+              uart_chr != 'a')
+            {
+                bt_package_counter = 0;
+                lin_uart_send_message("yecy");
+                return;
+            }
+        }
+        bt_message[bt_package_counter] = (char) uart_chr;
+        bt_package_counter ++;
+    }
+    else // counter >= 6
+    {
+        // out of bound
+        if(uart_chr != 'x')
+        {
+            bt_package_counter = 0;
+            lin_uart_send_message("yeuy");
+            return;
+        }
+        // convert data to int
+        bt_data = atoi(&bt_message[3]);
+        if(bt_message[1] == 'f')
+        {
+            operation = Forward;
+            if(bt_message[2] == 'd')
+            {
+                bt_data = bt_data / TILE_SIZE;
+                //lin_pwm_move_forward();
+            }
+        }
+        else if(bt_message[1] == 'b')
+        {
+            operation = Backward;
+            if(bt_message[2] == 'd')
+            {
+                bt_data = bt_data / TILE_SIZE;
+//                lin_pwm_move_backward(bt_data / TILE_SIZE);
+            }
+        }
+        
+        // Check for angle greater than 360
+        else if( bt_data > 360 )
+        {
+            lin_uart_send_message("yery");
+            return;
+        }
+        
+        else if(bt_message[1] == 'l')
+        {
+            operation = Clockwise;
+//            lin_pwm_rotate_ccw(bt_data);
+        }
+        else if(bt_message[1] == 'r')
+        {
+            operation = CounterClockwise;
+//            lin_pwm_rotate_cw(bt_data);
+        }
         bt_package_counter = 0;
-	}
+    }
 } // end of handle bluetooth char
 
 /* Used to handle the button presses based on the value
@@ -444,164 +399,164 @@ static void handle_bluetooth_char(alt_u8 uart_chr)
 
 static void handle_button_press()
 {
-	switch (edge_capture)
-	{
-		case 0x1:
-		// INSERT THE CODE TO PROCESS SW0
-		// BETWEEN THE TWO ROWS OF STARS
-		/************************************/
-		if (mode)
-		{
-			// Mode 2
-			// Increase Radius
-			radiusIndex = ++radiusIndex % (sizeof(radiusLength)/sizeof(int*));
-		}
-		else
-		{
-			// Mode 1
-			lin_pwm_move_forward(radiusLength[radiusIndex]);
-			displayMsgLCD("Stopped");
-		}
-		
-		/***********************************/
-		edge_capture = 0;
-		break;
-		
-		case 0x2:
-		// INSERT THE CODE TO PROCESS SW1
-		// BETWEEN THE TWO ROWS OF STARS
-		/************************************/
-		if (mode)
-		{
-			// Mode 2
-			lin_pwm_rotate_ccw(90);
-			displayMsgLCD("Stopped");
-		}
-		else
-		{
-			// Mode 1
-		}
-		/************************************/
-		edge_capture = 0;
-		break;
-		
-		case 0x4:
-		// INSERT THE CODE TO PROCESS SW2
-		// BETWEEN THE TWO ROWS OF STARS
-		/************************************/
-		if (mode)
-		{
-			// Mode 2
-			perform_circle(10);
-			displayMsgLCD("Stopped");
-		}
-		else
-		{
-			// Mode 1
-			lin_pwm_rotate_cw(90);
-			displayMsgLCD("Stopped");
-		}
-		/************************************/
-		edge_capture = 0;
-		break;
-		
-		case 0x8:
-		// INSERT THE CODE TO PROCESS SW3
-		// BETWEEN THE TWO ROWS OF STARS
-		/************************************/
-		mode = !mode;
-		if (mode)
-		{
-			// Mode 2
-			sevenseg_set_hex(2);
-		}
-		else
-		{
-			// Mode 1
-			sevenseg_set_hex(1);
-		}
-		/************************************/
-		edge_capture = 0;
-		break;
-	}
-	usleep(10000);
+    switch (edge_capture)
+    {
+        case 0x1:
+        // INSERT THE CODE TO PROCESS SW0
+        // BETWEEN THE TWO ROWS OF STARS
+        /************************************/
+        if (mode)
+        {
+            // Mode 2
+            // Increase Radius
+            radiusIndex = ++radiusIndex % (sizeof(radiusLength)/sizeof(int*));
+        }
+        else
+        {
+            // Mode 1
+            lin_pwm_move_forward(radiusLength[radiusIndex]);
+            displayMsgLCD("Stopped");
+        }
+        
+        /***********************************/
+        edge_capture = 0;
+        break;
+        
+        case 0x2:
+        // INSERT THE CODE TO PROCESS SW1
+        // BETWEEN THE TWO ROWS OF STARS
+        /************************************/
+        if (mode)
+        {
+            // Mode 2
+            lin_pwm_rotate_ccw(90);
+            displayMsgLCD("Stopped");
+        }
+        else
+        {
+            // Mode 1
+            lin_pwm_move_backward(radiusLength[radiusIndex]);
+        }
+        /************************************/
+        edge_capture = 0;
+        break;
+        
+        case 0x4:
+        // INSERT THE CODE TO PROCESS SW2
+        // BETWEEN THE TWO ROWS OF STARS
+        /************************************/
+        if (mode)
+        {
+            // Mode 2
+            perform_circle(10);
+            displayMsgLCD("Stopped");
+        }
+        else
+        {
+            // Mode 1
+            lin_pwm_rotate_cw(90);
+            displayMsgLCD("Stopped");
+        }
+        /************************************/
+        edge_capture = 0;
+        break;
+        
+        case 0x8:
+        // INSERT THE CODE TO PROCESS SW3
+        // BETWEEN THE TWO ROWS OF STARS
+        /************************************/
+        mode = !mode;
+        if (mode)
+        {
+            // Mode 2
+            sevenseg_set_hex(2);
+        }
+        else
+        {
+            // Mode 1
+            sevenseg_set_hex(1);
+        }
+        /************************************/
+        edge_capture = 0;
+        break;
+    }
 }
 
 /* Displays a string on the LCD display. */
 
 static void displayMsgLCD(alt_u8* msg)
 {
-	// center the tex on two lines
-	alt_u8 *pNewMsg = center_string(msg);
-	FILE *lcd;
-	lcd = fopen("/dev/lcd_display", "w");
-	// Clear the screen
-	fprintf(lcd, "\n\n");
-	// Display msg
-	fprintf(lcd, pNewMsg);
-	fflush(lcd);
-	fclose(lcd);
-	//pNewMsg must be free'd
-	free(pNewMsg);
+    // center the tex on two lines
+    alt_u8 *pNewMsg = center_string(msg);
+    FILE *lcd;
+    lcd = fopen("/dev/lcd_display", "w");
+    // Clear the screen
+    fprintf(lcd, "\n\n");
+    // Display msg
+    fprintf(lcd, pNewMsg);
+    fflush(lcd);
+    fclose(lcd);
+    //pNewMsg must be free'd
+    free(pNewMsg);
 }
 
 /* Displays an 8-bit pattern on the eight LEDs. */
 
 static void displayLED(alt_u8 pattern)
 {
-	// reverse the LED pattern
-	pattern = reverse_bit_pattern(pattern);
-	IOWR_ALTERA_AVALON_PIO_DATA(LED_PIO_BASE, pattern);
+    // reverse the LED pattern
+    pattern = reverse_bit_pattern(pattern);
+    IOWR_ALTERA_AVALON_PIO_DATA(LED_PIO_BASE, pattern);
 }
 
 /* Displays an 8-bit number on the seven-segment display. */
 
 static void sevenseg_set_hex(alt_u8 hex)
 {
-	// change the hex to dec display
-	hex = hex_to_dec(hex);
-	static alt_u8 segments[16] = {
-	0x81, 0xCF, 0x92, 0x86, 0xCC, 0xA4, 0xA0, 0x8F, 0x80, 0x84, /* 0-9 */
-	0x88, 0xE0, 0xF2, 0xC2, 0xB0, 0xB8 };                       /* a-f */
-	
-	alt_u32 data = segments[hex & 15] | (segments[(hex >> 4) & 15] << 8);
-	
-	IOWR_ALTERA_AVALON_PIO_DATA(SEVEN_SEG_PIO_BASE, data);
+    // change the hex to dec display
+    hex = hex_to_dec(hex);
+    static alt_u8 segments[16] = {
+    0x81, 0xCF, 0x92, 0x86, 0xCC, 0xA4, 0xA0, 0x8F, 0x80, 0x84, /* 0-9 */
+    0x88, 0xE0, 0xF2, 0xC2, 0xB0, 0xB8 };                       /* a-f */
+    
+    alt_u32 data = segments[hex & 15] | (segments[(hex >> 4) & 15] << 8);
+    
+    IOWR_ALTERA_AVALON_PIO_DATA(SEVEN_SEG_PIO_BASE, data);
 }
 
 /* Interrupt handler for button_pio */
 
 static void handle_button_interrupts(void* context, alt_u32 id)
 {
-	/* Cast context to edge_capture's type.
-	 * It is important to keep this volatile,
-	 * to avoid compiler optimization issues.
-	 */
-	volatile int* edge_capture_ptr = (volatile int*) context;
-	
-	/* Store the value in the Button's edge capture register in *context. */
-	*edge_capture_ptr = IORD_ALTERA_AVALON_PIO_EDGE_CAP(BUTTON_PIO_BASE);
-	
-	/* Reset the Button's edge capture register. */
-	IOWR_ALTERA_AVALON_PIO_EDGE_CAP(BUTTON_PIO_BASE, 0);
+    /* Cast context to edge_capture's type.
+     * It is important to keep this volatile,
+     * to avoid compiler optimization issues.
+     */
+    volatile int* edge_capture_ptr = (volatile int*) context;
+    
+    /* Store the value in the Button's edge capture register in *context. */
+    *edge_capture_ptr = IORD_ALTERA_AVALON_PIO_EDGE_CAP(BUTTON_PIO_BASE);
+    
+    /* Reset the Button's edge capture register. */
+    IOWR_ALTERA_AVALON_PIO_EDGE_CAP(BUTTON_PIO_BASE, 0);
 }
 
 /* Initializes the button_pio interrupt handler. */
 
 static void init_button_pio()
 {
-	/* Recast the edge_capture pointer to match the alt_irq_register() function
-	* prototype. */
-	void* edge_capture_ptr = (void*) &edge_capture;
-	
-	/* Enable all 4 button interrupts. */
-	IOWR_ALTERA_AVALON_PIO_IRQ_MASK(BUTTON_PIO_BASE, 0xf);
-	
-	/* Reset the edge capture register. */
-	IOWR_ALTERA_AVALON_PIO_EDGE_CAP(BUTTON_PIO_BASE, 0x0);
-	
-	/* Register the interrupt handler. */
-	alt_irq_register(BUTTON_PIO_IRQ, edge_capture_ptr, handle_button_interrupts ); 
+    /* Recast the edge_capture pointer to match the alt_irq_register() function
+    * prototype. */
+    void* edge_capture_ptr = (void*) &edge_capture;
+    
+    /* Enable all 4 button interrupts. */
+    IOWR_ALTERA_AVALON_PIO_IRQ_MASK(BUTTON_PIO_BASE, 0xf);
+    
+    /* Reset the edge capture register. */
+    IOWR_ALTERA_AVALON_PIO_EDGE_CAP(BUTTON_PIO_BASE, 0x0);
+    
+    /* Register the interrupt handler. */
+    alt_irq_register(BUTTON_PIO_IRQ, edge_capture_ptr, handle_button_interrupts ); 
 }
 
 /* Interrupt handler for UART1 */
@@ -635,7 +590,7 @@ static void handle_uart1_interrupt(void* context, alt_u32 id)
 		#endif
 		
 		// Here we actually handle the interupt as they come in..
-		handle_bluetooth_char(uart_chr);
+//		handle_bluetooth_char(uart_chr);
 	}
 }
 
@@ -643,19 +598,19 @@ static void handle_uart1_interrupt(void* context, alt_u32 id)
 
 static void init_uart(alt_u8 mask)
 {
-	if (mask & UART1) {
-		/* Set the baud rate */
-		IOWR_FE_UART_BAUDRATE(FE_BUFFERED_UART_BASE, BAUD_57600);
-		
-		/* Reset the UART */
-		IOWR_FE_UART_CONTROL(FE_BUFFERED_UART_BASE, FE_UART_RESET);
-		
-		/* Settup the ISR for the uart */    
-		alt_irq_register(FE_BUFFERED_UART_IRQ, NULL, handle_uart1_interrupt);
-		
-		/* enable the receiver and transmitter on the uart */
-		IOWR_FE_UART_CONTROL(FE_BUFFERED_UART_BASE, FE_UART_EN_RX | FE_UART_EN_TX);
-	}
+    if (mask & UART1) {
+        /* Set the baud rate */
+        IOWR_FE_UART_BAUDRATE(FE_BUFFERED_UART_BASE, BAUD_57600);
+        
+        /* Reset the UART */
+        IOWR_FE_UART_CONTROL(FE_BUFFERED_UART_BASE, FE_UART_RESET);
+        
+        /* Settup the ISR for the uart */    
+        alt_irq_register(FE_BUFFERED_UART_IRQ, NULL, handle_uart1_interrupt);
+        
+        /* enable the receiver and transmitter on the uart */
+        IOWR_FE_UART_CONTROL(FE_BUFFERED_UART_BASE, FE_UART_EN_RX | FE_UART_EN_TX);
+    }
 }
 
 /* Used to send a message (null-terminated string) to
@@ -664,37 +619,37 @@ static void init_uart(alt_u8 mask)
 
 static void send_message_to_uart(alt_u8 uart_no, alt_u8* message)
 {
-	int uart_base = 0;
-	int i = 0;
-	
-	/* See which UART port we want to send the message to,
-	* and set the uart_base accordingly.
-	*/
-	
-	if (uart_no == UART1)
-	uart_base = FE_BUFFERED_UART_BASE;
-	
-	if (uart_base){
-		#ifdef DEBUG_UART_XMIT
-		printf("[DEBUG-UART-XMIT] Sending message of length %d to UART\%d: ", message[MSG_F_LENGTH], uart_no);
-		#endif
-		
-		for (i = 0; i < message[MSG_F_LENGTH]; i++){
-			#ifdef DEBUG_UART_XMIT
-			printf("%d ", message[i]);
-			#endif
-			
-			IOWR_FE_UART_TXDATA(uart_base, message[i]);
-			usleep(1000);
-		}
-		#ifdef DEBUG_UART_XMIT
-		printf("\n");
-		#endif
-	}
-	#ifdef DEBUG_UART_XMIT
-	else 
-	printf("[DEBUG-UART-XMIT] Invalid UART number provided (uart_base=%d)!\n", uart_base);
-	#endif      
+    int uart_base = 0;
+    int i = 0;
+    
+    /* See which UART port we want to send the message to,
+    * and set the uart_base accordingly.
+    */
+    
+    if (uart_no == UART1)
+    uart_base = FE_BUFFERED_UART_BASE;
+    
+    if (uart_base){
+        #ifdef DEBUG_UART_XMIT
+        printf("[DEBUG-UART-XMIT] Sending message of length %d to UART\%d: ", message[MSG_F_LENGTH], uart_no);
+        #endif
+        
+        for (i = 0; i < message[MSG_F_LENGTH]; i++){
+            #ifdef DEBUG_UART_XMIT
+            printf("%d ", message[i]);
+            #endif
+            
+            IOWR_FE_UART_TXDATA(uart_base, message[i]);
+            usleep(1000);
+        }
+        #ifdef DEBUG_UART_XMIT
+        printf("\n");
+        #endif
+    }
+    #ifdef DEBUG_UART_XMIT
+    else 
+    printf("[DEBUG-UART-XMIT] Invalid UART number provided (uart_base=%d)!\n", uart_base);
+    #endif      
 }
 
 /* Initializes the LIN message structure received as
@@ -703,196 +658,199 @@ static void send_message_to_uart(alt_u8 uart_no, alt_u8* message)
 
 static void lin_message_init(LIN_MESSAGE *msg)
 {
-	msg->byte_counter = 0;
-	memset(msg->message_data, '\0', LIN_MESSAGE_MAX_SIZE);
+    msg->byte_counter = 0;
+    memset(msg->message_data, '\0', LIN_MESSAGE_MAX_SIZE);
 }
 
 /* Dispatches the LIN message received as a parameter. */
 
 static void lin_message_dispatch(LIN_MESSAGE *msg)
 {
-	int count = 0;
-	
-	#ifdef DEBUG_MESSAGE_DISPATCH
-	printf("[DEBUG-MESSAGE-DISPATCH] Message received and is ready to be dispatched:\n");
-	printf("[DEBUG-MESSAGE-DISPATCH]     Type: %d (", msg->message_data[MSG_F_TYPE]);
-	switch (msg->message_data[MSG_F_TYPE]){
-		case MSG_I_ACK:
-		printf("ACK)\n");
-		break;
-		case MSG_I_MOD_REPLY:
-		printf("MOD_REPLY)\n");
-		break;
-		case MSG_I_ADD_MODULE:
-		printf("ADD_MODULE)\n");
-		break;
-		case MSG_I_DATA_STREAM:
-		printf("DATA_STREAM)\n");
-		break;
-		default:
-		printf("UNKNOWN)\n");
-		break; 
-	}
-	printf("[DEBUG-MESSAGE-DISPATCH]     Data: ");
-	for (count = 0; count < msg->message_data[MSG_F_LENGTH]; count++)
-	printf("%d ", msg->message_data[count]);
-	printf("\n");
-	if ((msg->message_data[MSG_F_TYPE] == MSG_I_DATA_STREAM) &&
-	   (msg->message_data[MSG_F_MOD_TYPE] == MOD_UART)){
-		printf("[DEBUG-MESSAGE-DISPATCH]     Data (data bytes only, as chars): ");
-		for (count = MSG_F_DATA; count < msg->message_data[MSG_F_LENGTH]; count++)
-		printf("%c", msg->message_data[count]);
-		printf("\n");
-	}
-	#endif
-	
-	char buffer[16];
-	switch (msg->message_data[MSG_F_TYPE]){
-		case MSG_I_ACK:
-		break;
-		case MSG_I_MOD_REPLY:
-		
-		/* Depending on the desired functionality,
-		 * you may need to insert code here
-		 */
-		
-		/* Left Wheel Value */
-		if (msg->message_data[MSG_F_REG_NO] == NAME_LEFT_WHEEL)
-		{
-		counter_left = msg->message_data[MSG_F_DATA];
-		reply_left = 1;
-		}
-		/* Right Wheel Value */
-		else if (msg->message_data[MSG_F_REG_NO] == NAME_RIGHT_WHEEL)
-		{
-		counter_right = msg->message_data[MSG_F_DATA];
-		reply_right = 1;
-		}
-		
-		break;
-		case MSG_I_ADD_MODULE:
-		/* Once the last module (Safe Power) has been added,
-		 * perform some initialization steps for all modules
-		 */
-		if (msg->message_data[MSG_F_MOD_TYPE] == MOD_PWR) {
-		/* Reset LED status - turn all LEDs off */
-		lin_led_set(VAL_LED_ALL_OFF);
-		
-		/* Reset motor status - initialize periods and
-		 * make sure that the motors are stopped after this
-		 */
-		lin_pwm_init_period();
-		lin_pwm_full_stop();
-		
-		/* Initialize the Digital Inputs module:
-		 * - reset the counter values;
-		 * - enable the high-speed interrupts;
-		 * - subscribe to the counters.
-		 * 
-		 * The last step is optional, you can comment it out
-		 * if you do not use subscription.
-		 */
-		lin_dig_in_reset_counters();
-		lin_dig_in_enable_hsi();
-		//lin_dig_in_subscribe();
-		
-		/* Connect to the UART module.
-		 * This must be done in order to ensure proper
-		 * communication to the UART.
-		 */
-		lin_uart_open();
-		
-		/* You can add other initialization steps here,
-		 * as needed
-		 */  
-		}
-		break;
-		case MSG_I_DATA_STREAM:
-		
-		/* Depending on the desired functionality,
-		 * you may need to insert code here
-		 */
-		
-		sprintf (buffer, "loc=%d\nwheel=%d", msg->message_data[MSG_F_DATA+1], msg->message_data[MSG_F_DATA]);
-		displayMsgLCD(buffer);
-		
-		break;
-		default:
-		break;
-	}
-	
-	/* At the end, re-initialize the message structure
-	 * such that it can be used for the next message.
-	 */    
-	lin_message_init(msg);
+    int count = 0;
+    
+    #ifdef DEBUG_MESSAGE_DISPATCH
+    printf("[DEBUG-MESSAGE-DISPATCH] Message received and is ready to be dispatched:\n");
+    printf("[DEBUG-MESSAGE-DISPATCH]     Type: %d (", msg->message_data[MSG_F_TYPE]);
+    switch (msg->message_data[MSG_F_TYPE]){
+        case MSG_I_ACK:
+        printf("ACK)\n");
+        break;
+        case MSG_I_MOD_REPLY:
+        printf("MOD_REPLY)\n");
+        break;
+        case MSG_I_ADD_MODULE:
+        printf("ADD_MODULE)\n");
+        break;
+        case MSG_I_DATA_STREAM:
+        printf("DATA_STREAM)\n");
+        break;
+        default:
+        printf("UNKNOWN)\n");
+        break; 
+    }
+    printf("[DEBUG-MESSAGE-DISPATCH]     Data: ");
+    for (count = 0; count < msg->message_data[MSG_F_LENGTH]; count++)
+    printf("%d ", msg->message_data[count]);
+    printf("\n");
+    if ((msg->message_data[MSG_F_TYPE] == MSG_I_DATA_STREAM) &&
+       (msg->message_data[MSG_F_MOD_TYPE] == MOD_UART)){
+        printf("[DEBUG-MESSAGE-DISPATCH]     Data (data bytes only, as chars): ");
+        for (count = MSG_F_DATA; count < msg->message_data[MSG_F_LENGTH]; count++)
+        printf("%c", msg->message_data[count]);
+        printf("\n");
+    }
+    #endif
+    
+    char buffer[16];
+    switch (msg->message_data[MSG_F_TYPE]){
+        case MSG_I_ACK:
+        break;
+        case MSG_I_MOD_REPLY:
+        
+        /* Depending on the desired functionality,
+         * you may need to insert code here
+         */
+        
+        /* Left Wheel Value */
+        if (msg->message_data[MSG_F_REG_NO] == NAME_LEFT_WHEEL)
+        {
+        counter_left = msg->message_data[MSG_F_DATA];
+        reply_left = 1;
+        }
+        /* Right Wheel Value */
+        else if (msg->message_data[MSG_F_REG_NO] == NAME_RIGHT_WHEEL)
+        {
+        counter_right = msg->message_data[MSG_F_DATA];
+        reply_right = 1;
+        }
+        
+        break;
+        case MSG_I_ADD_MODULE:
+        /* Once the last module (Safe Power) has been added,
+         * perform some initialization steps for all modules
+         */
+        if (msg->message_data[MSG_F_MOD_TYPE] == MOD_PWR) {
+        /* Reset LED status - turn all LEDs off */
+        lin_led_set(VAL_LED_ALL_OFF);
+        
+        /* Reset motor status - initialize periods and
+         * make sure that the motors are stopped after this
+         */
+        lin_pwm_init_period();
+        lin_pwm_full_stop();
+        
+        /* Initialize the Digital Inputs module:
+         * - reset the counter values;
+         * - enable the high-speed interrupts;
+         * - subscribe to the counters.
+         * 
+         * The last step is optional, you can comment it out
+         * if you do not use subscription.
+         */
+        lin_dig_in_reset_counters();
+        lin_dig_in_enable_hsi();
+        //lin_dig_in_subscribe();
+        
+        /* Connect to the UART module.
+         * This must be done in order to ensure proper
+         * communication to the UART.
+         */
+        lin_uart_open();
+        
+        /* You can add other initialization steps here,
+         * as needed
+         */  
+        }
+        break;
+        case MSG_I_DATA_STREAM:
+        
+        /* Depending on the desired functionality,
+         * you may need to insert code here
+         */
+        
+            if (msg->message_data[MSG_F_REG_NO] == 1)
+                handle_bluetooth_char(msg->message_data[MSG_F_DATA]);
+        
+//        sprintf (buffer, "loc=%d\nwheel=%d", msg->message_data[MSG_F_DATA+1], msg->message_data[MSG_F_DATA]);
+//        displayMsgLCD(buffer);
+        
+            break;
+        default:
+        break;
+    }
+    
+    /* At the end, re-initialize the message structure
+     * such that it can be used for the next message.
+     */    
+    lin_message_init(msg);
 }
 
 /* Dispatches the character received as a parameter. */
 
 static void lin_char_dispatch(alt_u8 *chr)
 {
-	int count = 0;
-	
-	/* Insert the character in its place into the
-	 * global LIN message structure
-	 */
-	global_lin_message.message_data[global_lin_message.byte_counter] = *chr;
-	
-	#ifdef DEBUG_CHAR_DISPATCH
-	printf("[DEBUG-CHAR-DISPATCH] Current contents of global_lin_message:\n");
-	printf("[DEBUG-CHAR-DISPATCH]     byte_counter = %d\n", global_lin_message.byte_counter);
-	printf("[DEBUG-CHAR-DISPATCH]     message_data = ");
-	for (count = 0; count <= global_lin_message.byte_counter; count++)
-	printf("%d ", global_lin_message.message_data[count]);
-	printf("\n"); 
-	#endif
-	
-	/* If we have already received all the required
-	* characters, then dispatch the message; otherwise,
-	* increment the byte counter and advance the current
-	* char pointer
-	*/
-	if((global_lin_message.byte_counter >= MSG_F_LENGTH) &&
-	  (global_lin_message.byte_counter + 1 == 
-	  global_lin_message.message_data[MSG_F_LENGTH]))
-	  lin_message_dispatch(&global_lin_message);
-	else
-	  global_lin_message.byte_counter++;
-	
-	/* Advance the current char pointer; wrap around if
-	 * the queue size was hit
-	 */
-	global_lin_char_current++;
-	if(global_lin_char_current == LIN_CHAR_QUEUE_SIZE)
-	  global_lin_char_current = 0;
+    int count = 0;
+    
+    /* Insert the character in its place into the
+     * global LIN message structure
+     */
+    global_lin_message.message_data[global_lin_message.byte_counter] = *chr;
+    
+    #ifdef DEBUG_CHAR_DISPATCH
+    printf("[DEBUG-CHAR-DISPATCH] Current contents of global_lin_message:\n");
+    printf("[DEBUG-CHAR-DISPATCH]     byte_counter = %d\n", global_lin_message.byte_counter);
+    printf("[DEBUG-CHAR-DISPATCH]     message_data = ");
+    for (count = 0; count <= global_lin_message.byte_counter; count++)
+    printf("%d ", global_lin_message.message_data[count]);
+    printf("\n"); 
+    #endif
+    
+    /* If we have already received all the required
+    * characters, then dispatch the message; otherwise,
+    * increment the byte counter and advance the current
+    * char pointer
+    */
+    if((global_lin_message.byte_counter >= MSG_F_LENGTH) &&
+      (global_lin_message.byte_counter + 1 == 
+      global_lin_message.message_data[MSG_F_LENGTH]))
+      lin_message_dispatch(&global_lin_message);
+    else
+      global_lin_message.byte_counter++;
+    
+    /* Advance the current char pointer; wrap around if
+     * the queue size was hit
+     */
+    global_lin_char_current++;
+    if(global_lin_char_current == LIN_CHAR_QUEUE_SIZE)
+      global_lin_char_current = 0;
 }
 
 /* Sends a CONNECT message to the LIN. */
 
 static void lin_connect()
 {
-	char message[3];
-	
-	memset(message, '\0', 3);
-	
-	message[MSG_F_TYPE]   = MSG_O_CONNECT;
-	message[MSG_F_LENGTH] = 2;
-	
-	send_message_to_uart(1, message); 
+    char message[3];
+    
+    memset(message, '\0', 3);
+    
+    message[MSG_F_TYPE]   = MSG_O_CONNECT;
+    message[MSG_F_LENGTH] = 2;
+    
+    send_message_to_uart(1, message); 
 }
 
 /* Sends a DISCONNECT message to the LIN. */
 
 static void lin_disconnect()
 {
-	char message[3];
-	
-	memset(message, '\0', 3);
-	
-	message[MSG_F_TYPE]   = MSG_O_DISCONNECT;
-	message[MSG_F_LENGTH] = 2;
-	
-	send_message_to_uart(1, message); 
+    char message[3];
+    
+    memset(message, '\0', 3);
+    
+    message[MSG_F_TYPE]   = MSG_O_DISCONNECT;
+    message[MSG_F_LENGTH] = 2;
+    
+    send_message_to_uart(1, message); 
 }
 
 /* Sends a EXIT_BOOTLDR_MODE message to the LIN - 
@@ -904,16 +862,16 @@ static void lin_disconnect()
 
 static void lin_exit_bootldr_mode()
 {
-	char message[5];
-	
-	memset(message, '\0', 5);
-	
-	message[MSG_F_TYPE]       = MSG_O_EXIT_BOOTLDR_MODE;
-	message[MSG_F_LENGTH]     = 4;
-	message[MSG_F_MOD_TYPE]   = 0x08;
-	message[MSG_F_MOD_SERIAL] = 0x02;
-	
-	send_message_to_uart(1, message); 
+    char message[5];
+    
+    memset(message, '\0', 5);
+    
+    message[MSG_F_TYPE]       = MSG_O_EXIT_BOOTLDR_MODE;
+    message[MSG_F_LENGTH]     = 4;
+    message[MSG_F_MOD_TYPE]   = 0x08;
+    message[MSG_F_MOD_SERIAL] = 0x02;
+    
+    send_message_to_uart(1, message); 
 }
 
 /* Sets the OUTPUT register of the LED module to a
@@ -922,18 +880,18 @@ static void lin_exit_bootldr_mode()
 
 static void lin_led_set(alt_u8 data)
 {
-	char message[7];
-	
-	memset(message, '\0', 7);
-	
-	message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
-	message[MSG_F_LENGTH]     = 6;
-	message[MSG_F_MOD_TYPE]   = MOD_LED;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_LED_OUTPUT;
-	message[MSG_F_DATA]       = data;
-	
-	send_message_to_uart(1, message);   
+    char message[7];
+    
+    memset(message, '\0', 7);
+    
+    message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
+    message[MSG_F_LENGTH]     = 6;
+    message[MSG_F_MOD_TYPE]   = MOD_LED;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_LED_OUTPUT;
+    message[MSG_F_DATA]       = data;
+    
+    send_message_to_uart(1, message);   
 }
 
 /* Initializes the PWM module of the lin with the
@@ -942,23 +900,23 @@ static void lin_led_set(alt_u8 data)
 
 static void lin_pwm_init_period()
 {
-	char message[7];
-	
-	memset(message, '\0', 7);
-	
-	message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
-	message[MSG_F_LENGTH]     = 6;
-	message[MSG_F_MOD_TYPE]   = MOD_PWM;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_PERIOD_H;
-	message[MSG_F_DATA]       = VAL_PWM_PERIOD_H;
-	
-	send_message_to_uart(UART1, message);   
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_PERIOD_L;
-	message[MSG_F_DATA]       = VAL_PWM_PERIOD_L;
-	
-	send_message_to_uart(UART1, message);   
+    char message[7];
+    
+    memset(message, '\0', 7);
+    
+    message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
+    message[MSG_F_LENGTH]     = 6;
+    message[MSG_F_MOD_TYPE]   = MOD_PWM;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_PERIOD_H;
+    message[MSG_F_DATA]       = VAL_PWM_PERIOD_H;
+    
+    send_message_to_uart(UART1, message);   
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_PERIOD_L;
+    message[MSG_F_DATA]       = VAL_PWM_PERIOD_L;
+    
+    send_message_to_uart(UART1, message);   
 }
 
 /* Sends messages to the PWM module of the LIN such
@@ -967,33 +925,33 @@ static void lin_pwm_init_period()
 
 static void lin_pwm_full_stop()
 {
-	char message[7];
-	
-	memset(message, '\0', 7);
-	
-	message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
-	message[MSG_F_LENGTH]     = 6;
-	message[MSG_F_MOD_TYPE]   = MOD_PWM;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
-	
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
-	
-	send_message_to_uart(UART1, message);   
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_L;
-	
-	send_message_to_uart(UART1, message);   
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_L;
-	
-	send_message_to_uart(UART1, message);   
+    char message[7];
+    
+    memset(message, '\0', 7);
+    
+    message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
+    message[MSG_F_LENGTH]     = 6;
+    message[MSG_F_MOD_TYPE]   = MOD_PWM;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
+    
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
+    
+    send_message_to_uart(UART1, message);   
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_L;
+    
+    send_message_to_uart(UART1, message);   
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_L;
+    
+    send_message_to_uart(UART1, message);   
 }
 
 /* Sends messages to the LIN such that the robot starts
@@ -1002,125 +960,125 @@ static void lin_pwm_full_stop()
 
 static void lin_pwm_move_forward(float numTiles)
 {
-	lin_led_set(VAL_LED_MOVING_FORWARD);
-	displayMsgLCD("Moving FWD");
-	
-	char message[7];
-	
-	memset(message, '\0', 7);
-	lin_dig_in_reset_counters();
-	
-	message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
-	message[MSG_F_LENGTH]     = 6;
-	message[MSG_F_MOD_TYPE]   = MOD_PWM;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_H;
-	
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_H;
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_L;
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_L;
-	send_message_to_uart(UART1, message);
-	
-	// Self Correct wheel
-	//    lin_dig_in_read_counters();
-	//    self_correct_wheel();
-	
-	char buffer[16];
-	do
-	{
-		lin_dig_in_read_counters();
-		
-		#ifdef DEBUG_CHAR_DISPATCH
-		sprintf(buffer, "counter_left=%d", counter_left);
-		#endif
-		
-		displayMsgLCD(buffer);
-		usleep(30000);
-	}while(counter_left < (numTiles * SLICES_PER_TILE));
-	
-	lin_pwm_full_stop();
+    lin_led_set(VAL_LED_MOVING_FORWARD);
+    displayMsgLCD("Moving FWD");
+    
+    char message[7];
+    
+    memset(message, '\0', 7);
+    lin_dig_in_reset_counters();
+    
+    message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
+    message[MSG_F_LENGTH]     = 6;
+    message[MSG_F_MOD_TYPE]   = MOD_PWM;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_H;
+    
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_H;
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_L;
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_L;
+    send_message_to_uart(UART1, message);
+    
+    // Self Correct wheel
+    //    lin_dig_in_read_counters();
+    //    self_correct_wheel();
+    
+    char buffer[16];
+    do
+    {
+        lin_dig_in_read_counters();
+        
+        #ifdef DEBUG_CHAR_DISPATCH
+        sprintf(buffer, "counter_left=%d", counter_left);
+        #endif
+        
+        displayMsgLCD(buffer);
+        usleep(30000);
+    }while(counter_left < (numTiles * SLICES_PER_TILE));
+    
+    lin_pwm_full_stop();
 }
 
 static void self_correct_wheel()
 {
-	char message[7];
-	
-	memset(message, '\0', 7);
-	
-	message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
-	message[MSG_F_LENGTH]     = 6;
-	message[MSG_F_MOD_TYPE]   = MOD_PWM;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	
-	printf("counter_left=%d, counter_right=%d\n", counter_left, counter_right);
-	
-	// Check what wheel is off
-	if (counter_left > counter_right)
-	{
-		// correct right wheel - stop left
-		message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
-		message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
-		
-		send_message_to_uart(UART1, message);   
-		
-		message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
-		message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_L;
-		
-		send_message_to_uart(UART1, message);
-		
-		do{
-			lin_dig_in_read_counters();
-		}while(counter_right < counter_left-2);
-		
-		// Resume left wheel
-		message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
-		message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_H;
-		
-		send_message_to_uart(UART1, message);
-		
-		message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
-		message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_L;
-		send_message_to_uart(UART1, message);
-	}
-	else if (counter_left < counter_right)
-	{
-		// correct left wheel - stop right wheel
-		message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
-		message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
-		
-		send_message_to_uart(UART1, message);   
-		
-		message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
-		message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_L;
-		
-		send_message_to_uart(UART1, message);
-		
-		do{
-			lin_dig_in_read_counters();
-		}while(counter_left < counter_right-2);
-		
-		// Resume right wheel
-		message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
-		message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_H;
-		
-		send_message_to_uart(UART1, message);
-		
-		message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
-		message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_L;
-		send_message_to_uart(UART1, message);        
-	}
-	
-	printf("counter_left=%d, counter_right=%d\n", counter_left, counter_right);
+    char message[7];
+    
+    memset(message, '\0', 7);
+    
+    message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
+    message[MSG_F_LENGTH]     = 6;
+    message[MSG_F_MOD_TYPE]   = MOD_PWM;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    
+    printf("counter_left=%d, counter_right=%d\n", counter_left, counter_right);
+    
+    // Check what wheel is off
+    if (counter_left > counter_right)
+    {
+        // correct right wheel - stop left
+        message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
+        message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
+        
+        send_message_to_uart(UART1, message);   
+        
+        message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
+        message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_L;
+        
+        send_message_to_uart(UART1, message);
+        
+        do{
+            lin_dig_in_read_counters();
+        }while(counter_right < counter_left-2);
+        
+        // Resume left wheel
+        message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
+        message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_H;
+        
+        send_message_to_uart(UART1, message);
+        
+        message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
+        message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_L;
+        send_message_to_uart(UART1, message);
+    }
+    else if (counter_left < counter_right)
+    {
+        // correct left wheel - stop right wheel
+        message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
+        message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_H;
+        
+        send_message_to_uart(UART1, message);   
+        
+        message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
+        message[MSG_F_DATA]       = VAL_PWM_DUTY_STOP_L;
+        
+        send_message_to_uart(UART1, message);
+        
+        do{
+            lin_dig_in_read_counters();
+        }while(counter_left < counter_right-2);
+        
+        // Resume right wheel
+        message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
+        message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_H;
+        
+        send_message_to_uart(UART1, message);
+        
+        message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
+        message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_L;
+        send_message_to_uart(UART1, message);        
+    }
+    
+    printf("counter_left=%d, counter_right=%d\n", counter_left, counter_right);
 }
 
 /* Sends messages to the LIN such that the robot starts
@@ -1129,52 +1087,49 @@ static void self_correct_wheel()
 
 static void lin_pwm_move_backward(int numTiles)
 {
-	lin_led_set(VAL_LED_MOVING_BACKWARD);
-	displayMsgLCD("Moving BK");
-	
-	char message[7];
-	
-	memset(message, '\0', 7);
-	
-	message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
-	message[MSG_F_LENGTH]     = 6;
-	message[MSG_F_MOD_TYPE]   = MOD_PWM;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_BACKWARD_H;
-	
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_BACKWARD_H;
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_BACKWARD_L;
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_BACKWARD_L;
-	send_message_to_uart(UART1, message);
-	
-	char buffer[16];
-	int locLeft = 0;
-	do
-	{
-		locLeft += counter_left;
-		
-		lin_dig_in_reset_counters();
-		lin_dig_in_read_counters();
-		
-		#ifdef DEBUG_CHAR_DISPATCH
-		sprintf(buffer, "counter_left=%d", counter_left);
-		#endif
-		
-		displayMsgLCD(buffer);
-		usleep(30000);
-	}while(locLeft < (numTiles * SLICES_PER_TILE));
-	
-	lin_pwm_full_stop();
+    lin_led_set(VAL_LED_MOVING_BACKWARD);
+    displayMsgLCD("Moving BK");
+    lin_dig_in_reset_counters();
+    
+    char message[7];
+    
+    memset(message, '\0', 7);
+    
+    message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
+    message[MSG_F_LENGTH]     = 6;
+    message[MSG_F_MOD_TYPE]   = MOD_PWM;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_BACKWARD_H;
+    
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_BACKWARD_H;
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_BACKWARD_L;
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_BACKWARD_L;
+    send_message_to_uart(UART1, message);
+    
+    char buffer[16];
+    do
+    {
+        lin_dig_in_read_counters();
+        
+        #ifdef DEBUG_CHAR_DISPATCH
+        sprintf(buffer, "counter_left=%d", counter_left);
+        #endif
+        
+        displayMsgLCD(buffer);
+        usleep(30000);
+    }while(counter_left < (numTiles * SLICES_PER_TILE));
+    
+    lin_pwm_full_stop();
 
 }
 
@@ -1184,70 +1139,70 @@ static void lin_pwm_move_backward(int numTiles)
 
 static void lin_pwm_rotate_cw(float degrees)
 {
-	displayMsgLCD("Direction: CW");
-	lin_led_set(VAL_LED_TURNING_CW);
-	lin_pwm_rotate(degrees);
+    displayMsgLCD("Direction: CW");
+    lin_led_set(VAL_LED_TURNING_CW);
+    lin_pwm_rotate(degrees);
 }
 
 static void lin_pwm_rotate(float degrees)
 {
-	char message[7];
-	
-	memset(message, '\0', 7);
-	
-	message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
-	message[MSG_F_LENGTH]     = 6;
-	message[MSG_F_MOD_TYPE]   = MOD_PWM;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
-	if (degrees < 0)
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_BACKWARD_H;
-	else
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_H;
-	
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
-	if (degrees < 0)
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_H;
-	else
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_BACKWARD_H;
-	
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
-	if (degrees < 0)
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_BACKWARD_L;
-	else
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_L;
-	
-	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
-	if (degrees < 0)
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_L;
-	else
-	message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_BACKWARD_L;
-	
-	send_message_to_uart(UART1, message);
-	
-	// Reset counters
-	lin_dig_in_reset_counters();
-	
-	char buffer[16];
-	do
-	{
-		lin_dig_in_read_counters();
-		
-		#ifdef DEBUG_CHAR_DISPATCH
-		sprintf(buffer, "counter_left=%d", counter_left);
-		#endif
-		
-		displayMsgLCD(buffer);
-		usleep(9000);
-	}while(counter_left < (degrees * DEGREE_PER_SLICE));
-	
-	lin_pwm_full_stop();
+    // Reset counters
+    lin_dig_in_reset_counters();
+    
+    char message[7];
+    
+    memset(message, '\0', 7);
+    
+    message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
+    message[MSG_F_LENGTH]     = 6;
+    message[MSG_F_MOD_TYPE]   = MOD_PWM;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_H;
+    if (degrees < 0)
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_BACKWARD_H;
+    else
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_H;
+    
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_H;
+    if (degrees < 0)
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_H;
+    else
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_BACKWARD_H;
+    
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M2_DUTY_L;
+    if (degrees < 0)
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_BACKWARD_L;
+    else
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_LEFT_FORWARD_L;
+    
+    send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_WRITE | REG_RW_PWM_M1_DUTY_L;
+    if (degrees < 0)
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_FORWARD_L;
+    else
+    message[MSG_F_DATA]       = VAL_PWM_DUTY_RIGHT_BACKWARD_L;
+    
+    send_message_to_uart(UART1, message);
+    
+    char buffer[16];
+    do
+    {
+        lin_dig_in_read_counters();
+        
+        #ifdef DEBUG_CHAR_DISPATCH
+        sprintf(buffer, "counter_left=%d", counter_left);
+        #endif
+        
+        displayMsgLCD(buffer);
+        usleep(9000);
+    }while(counter_left < fabs(degrees * DEGREE_PER_SLICE));
+    
+    lin_pwm_full_stop();
 }
 
 /* Sends messages to the LIN such that the robot starts
@@ -1256,67 +1211,67 @@ static void lin_pwm_rotate(float degrees)
 
 static void lin_pwm_rotate_ccw(float degrees)
 {
-	displayMsgLCD("Direction: CCW");
-	lin_led_set(VAL_LED_TURNING_CCW);
-	lin_pwm_rotate(degrees * -1);
+    displayMsgLCD("Direction: CCW");
+    lin_led_set(VAL_LED_TURNING_CCW);
+    lin_pwm_rotate(degrees * -1);
 }
 
 /* Reads the current counter value */
 
 static void lin_dig_in_read_counters()
 {
-	char message[6];
-	
-	memset(message, '\0', 6);
-	
-	message[MSG_F_TYPE]       = MSG_O_READ_MOD;
-	message[MSG_F_LENGTH]     = 5;
-	message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	//	message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_RIGHT_WHEEL;
-	//
-	//	send_message_to_uart(UART1, message);
-	
-	message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_LEFT_WHEEL;
-	send_message_to_uart(UART1, message);
-	
-	// Check reply
-	//	while(!reply_left && !reply_right)
-	while(!reply_left)
-	{
-		if (global_lin_char_current != global_lin_char_next) {
-			#ifdef DEBUG_CHAR_DISPATCH
-			printf("[DEBUG-CHAR-DISPATCH] Dispatch condition hit: %d != %d\n",
-			global_lin_char_current, global_lin_char_next);
-			#endif
-			
-			/* Dispatch the outstanding character */
-			lin_char_dispatch(&global_lin_char_queue[global_lin_char_current]);
-		}
-	}
-	
-	reply_left = 0;
-	reply_right = 0;
+    char message[6];
+    
+    memset(message, '\0', 6);
+    
+    message[MSG_F_TYPE]       = MSG_O_READ_MOD;
+    message[MSG_F_LENGTH]     = 5;
+    message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    //  message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_RIGHT_WHEEL;
+    //
+    //  send_message_to_uart(UART1, message);
+    
+    message[MSG_F_REG_NO]     = REG_MASK_READ | VAL_LEFT_WHEEL;
+    send_message_to_uart(UART1, message);
+    
+    // Check reply
+    //  while(!reply_left && !reply_right)
+    while(!reply_left)
+    {
+        if (global_lin_char_current != global_lin_char_next) {
+            #ifdef DEBUG_CHAR_DISPATCH
+            printf("[DEBUG-CHAR-DISPATCH] Dispatch condition hit: %d != %d\n",
+            global_lin_char_current, global_lin_char_next);
+            #endif
+            
+            /* Dispatch the outstanding character */
+            lin_char_dispatch(&global_lin_char_queue[global_lin_char_current]);
+        }
+    }
+    
+    reply_left = 0;
+    reply_right = 0;
 }
 
 /* Resets the counters of the Digital Inputs module. */
 
 static void lin_dig_in_reset_counters()
 {
-	char message[6];
-	
-	memset(message, '\0', 6);
-	
-	message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
-	message[MSG_F_LENGTH]     = 5;
-	message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = CMD_DIG_IN_RESET_COUNTERS;
-	
-	send_message_to_uart(UART1, message);
-	
-	counter_left = 0;
-	counter_right = 0;
+    char message[6];
+    
+    memset(message, '\0', 6);
+    
+    message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
+    message[MSG_F_LENGTH]     = 5;
+    message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = CMD_DIG_IN_RESET_COUNTERS;
+    
+    send_message_to_uart(UART1, message);
+    
+    counter_left = 0;
+    counter_right = 0;
 }
 
 /* Enables the high-speed inputs of the 
@@ -1325,17 +1280,17 @@ static void lin_dig_in_reset_counters()
 
 static void lin_dig_in_enable_hsi()
 {
-	char message[6];
-	
-	memset(message, '\0', 6);
-	
-	message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
-	message[MSG_F_LENGTH]     = 5;
-	message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = CMD_DIG_IN_ENABLE_HSI;
-	
-	send_message_to_uart(UART1, message);   
+    char message[6];
+    
+    memset(message, '\0', 6);
+    
+    message[MSG_F_TYPE]       = MSG_O_WRITE_MOD;
+    message[MSG_F_LENGTH]     = 5;
+    message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = CMD_DIG_IN_ENABLE_HSI;
+    
+    send_message_to_uart(UART1, message);   
 }
 
 /* Subscribes to the counters of the Digital Inputs 
@@ -1346,20 +1301,20 @@ static void lin_dig_in_enable_hsi()
 
 static void lin_dig_in_subscribe()
 {
-	char message[9];
-	
-	memset(message, '\0', 9);
-	
-	message[MSG_F_TYPE]       = MSG_O_SUBSCRIBE;
-	message[MSG_F_LENGTH]     = 8;
-	message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = REG_SUB_DIG_IN_COUNTER;
-	message[MSG_F_DATA]       = 0x00;
-	message[MSG_F_DATA + 1]   = 0x0A;
-	message[MSG_F_DATA + 2]   = VAL_DIG_IN_SUB_CONFIG_DIFF_FILTER;
-	
-	send_message_to_uart(UART1, message);   
+    char message[9];
+    
+    memset(message, '\0', 9);
+    
+    message[MSG_F_TYPE]       = MSG_O_SUBSCRIBE;
+    message[MSG_F_LENGTH]     = 8;
+    message[MSG_F_MOD_TYPE]   = MOD_DIG_IN;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = REG_SUB_DIG_IN_COUNTER;
+    message[MSG_F_DATA]       = 0x00;
+    message[MSG_F_DATA + 1]   = 0x0A;
+    message[MSG_F_DATA + 2]   = VAL_DIG_IN_SUB_CONFIG_DIFF_FILTER;
+    
+    send_message_to_uart(UART1, message);   
 }
 
 /* Initializes ("opens") the COM port of the LIN UART module                                                            
@@ -1368,17 +1323,17 @@ static void lin_dig_in_subscribe()
 
 static void lin_uart_open()                                                                                             
 {                                                                                                                       
-	char message[6];                                                                                                      
-	
-	memset(message, '\0', 6);
-	
-	message[MSG_F_TYPE]       = MSG_O_OPEN_COM;
-	message[MSG_F_LENGTH]     = 5;
-	message[MSG_F_MOD_TYPE]   = MOD_UART;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = VAL_UART_PORT_NO;
-	
-	send_message_to_uart(UART1, message);
+    char message[6];                                                                                                      
+    
+    memset(message, '\0', 6);
+    
+    message[MSG_F_TYPE]       = MSG_O_OPEN_COM;
+    message[MSG_F_LENGTH]     = 5;
+    message[MSG_F_MOD_TYPE]   = MOD_UART;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = VAL_UART_PORT_NO;
+    
+    send_message_to_uart(UART1, message);
 }
 
 /* Sends a null-terminated string to the device attached to the
@@ -1387,53 +1342,53 @@ static void lin_uart_open()
 
 static void lin_uart_send_message(alt_u8 *msg)
 {
-	int i = 0;
-	char message[255];
-	
-	memset(message, '\0', 255);
-	
-	message[MSG_F_TYPE]       = MSG_O_DATA_STREAM;
-	message[MSG_F_LENGTH]     = 5 + strlen(msg);
-	message[MSG_F_MOD_TYPE]   = MOD_UART;
-	message[MSG_F_MOD_SERIAL] = 0x00;
-	message[MSG_F_REG_NO]     = VAL_UART_PORT_NO;
+    int i = 0;
+    char message[255];
+    
+    memset(message, '\0', 255);
+    
+    message[MSG_F_TYPE]       = MSG_O_DATA_STREAM;
+    message[MSG_F_LENGTH]     = 5 + strlen(msg);
+    message[MSG_F_MOD_TYPE]   = MOD_UART;
+    message[MSG_F_MOD_SERIAL] = 0x00;
+    message[MSG_F_REG_NO]     = VAL_UART_PORT_NO;
 
-  	for (i = 0; i < strlen(msg); i++)
-   		message[MSG_F_DATA + i] = msg[i];
+    for (i = 0; i < strlen(msg); i++)
+        message[MSG_F_DATA + i] = msg[i];
 
-	send_message_to_uart(UART1, message);
+    send_message_to_uart(UART1, message);
 }
 
 static void perform_circle(int numberOfSides)
 {
-	float length = calculateSideLength(numberOfSides, radiusLength[radiusIndex]);
-	float angle = calculateAngles(numberOfSides);
-	
-	// Move current radius
-	lin_pwm_move_forward(radiusLength[radiusIndex]);
-	
-	// Turn 90 Degrees
-	lin_pwm_rotate_cw(90);
-	
-	// Move half a tile
-	lin_pwm_move_forward((length/2));
-	
-	int i = 0;
-	for(; i < numberOfSides-1; i++)
-	{
-		// Turn
-		lin_pwm_rotate_cw(angle);
-		
-		// Move Forward
-		lin_pwm_move_forward(length);
-	}
-	
-	// Move half a tile
-	lin_pwm_move_forward(length/2);
-	
-	// Turn 90 Degrees
-	lin_pwm_rotate_cw(90);
-	
-	// Move current radius
-	lin_pwm_move_forward(radiusLength[radiusIndex]);
+    float length = calculateSideLength(numberOfSides, radiusLength[radiusIndex]);
+    float angle = calculateAngles(numberOfSides);
+    
+    // Move current radius
+    lin_pwm_move_forward(radiusLength[radiusIndex]);
+    
+    // Turn 90 Degrees
+    lin_pwm_rotate_cw(90);
+    
+    // Move half a tile
+    lin_pwm_move_forward((length/2));
+    
+    int i = 0;
+    for(; i < numberOfSides-1; i++)
+    {
+        // Turn
+        lin_pwm_rotate_cw(angle);
+        
+        // Move Forward
+        lin_pwm_move_forward(length);
+    }
+    
+    // Move half a tile
+    lin_pwm_move_forward(length/2);
+    
+    // Turn 90 Degrees
+    lin_pwm_rotate_cw(90);
+    
+    // Move current radius
+    lin_pwm_move_forward(radiusLength[radiusIndex]);
 }
