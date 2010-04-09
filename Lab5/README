@@ -1,0 +1,5 @@
+Requirements
+============
+This project uses IronPython and WPF (.NET 3.0+)
+
+The project has been setup using Eclipse w/ PyDev plugin (pydev.org)
