@@ -50,6 +50,12 @@ class Lab5(object):
     def onClickStart(self, sender, event):
 	# Start the movement
 	s = str()
+	
+	# Keep angle of robot known
+	# 0 = Robot facing right
+	# 180 = Robot facing left, etc...
+	currentAngle = 0
+	
 	for i in range(len(self.path)-1):
 	    #s += "{0} - Row {1}, Column {2}\n".format(i, self.path[i][0], self.path[i][1])
 	    # Compare two taregst to see what movement needs to be performed
@@ -63,20 +69,57 @@ class Lab5(object):
 	    
 	    if self.path[i+1][0] == self.path[i][0]:
 		# On the same row, move horizontally
-		# Check if we must move backwards or forwards
+		# Check if we must move backwards (turn 180 and move forward)
+		# or forwards
 		if horizontal > 0 or i == 0:
-		    s += "Move forward {0} tiles\n".format(abs(horizontal))
+		    if currentAngle == 0:
+			s += "Move forward {0} tiles\n".format(abs(horizontal))
+		    else:
+			if currentAngle > 180:
+			    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(currentAngle, horizontal)
+			else:
+			    s += "Turn {0} degrees clockwise and move forward {1} tiles\n".format(currentAngle, horizontal)
+
+		    # Update currentAngle
+		    if i == 0 and horizontal < 0:
+			currentAngle = 180
+		    else:
+			currentAngle = 0
 		else:
-		    # Turn 180 degrees and move forward
-		    s += "Turn 180 degrees Counter clockwise and move forward {0} tiles\n".format(abs(horizontal))
+		    if currentAngle == 180:
+			s += "Move forward {0} tiles\n".format(abs(horizontal))
+		    else:
+			if currentAngle > 180:
+			    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(abs(180-currentAngle), abs(horizontal))
+			else:
+			    s += "Turn {0} degrees clockwise and move forward {1} tiles\n".format(180-currentAngle, abs(horizontal))
+		    currentAngle = 180
 	    elif self.path[i+1][1] == self.path[i][1]:
 		# On the same column, move vertically
 		if vertical > 0:
-		    s += "Turn 90 degrees clockwise and move forward {0} tiles\n".format(vertical)
+		    if currentAngle == 270:
+			s += "Move forward {0} tiles\n".format(vertical)
+		    else:
+			if currentAngle > 90 and currentAngle < 270:
+			    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(270-currentAngle, vertical)
+			else:
+			    s += "Turn {0} degrees clockwise and move forward {1} tiles\n".format(
+				currentAngle-270 if currentAngle > 270 else 90 + currentAngle,
+				vertical)
+		    currentAngle = 270
 		else:
-		    # Turn 90 degrees CCW and move forward
-		    s += "Turn 90 degrees counter clockwise and move forward {0} tiles\n".format(abs(vertical))
+		    if currentAngle == 90:
+			s += "Move forward {0} tiles\n".format(abs(vertical))
+		    else:
+			if currentAngle > 270 and currentAngle < 90:
+			    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(
+				360-currentAngle+90 if currentAngle > 270 else currentAngle,
+				abs(vertical))
+			else:
+			    s += "Turn {0} degrees clockwise and move forward {1} tiles\n".format(90-currentAngle, abs(vertical))
+		    currentAngle = 90
 	    else:
+		# TODO: Update to use currentAngles
 		# Move vertically
 		# calculate the diagonal to move
 		hypotenuse = math.sqrt( pow(abs(horizontal),2) +  pow(abs(vertical),2))
