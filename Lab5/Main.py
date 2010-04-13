@@ -76,7 +76,7 @@ class Lab5(object):
 			s += "Move forward {0} tiles\n".format(abs(horizontal))
 		    else:
 			if currentAngle > 180:
-			    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(currentAngle, horizontal)
+			    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(abs(180-currentAngle), horizontal)
 			else:
 			    s += "Turn {0} degrees clockwise and move forward {1} tiles\n".format(currentAngle, horizontal)
 
@@ -90,9 +90,9 @@ class Lab5(object):
 			s += "Move forward {0} tiles\n".format(abs(horizontal))
 		    else:
 			if currentAngle > 180:
-			    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(abs(180-currentAngle), abs(horizontal))
+			    s += "Turn {0} degrees clockwise and move forward {1} tiles\n".format(abs(180-currentAngle), abs(horizontal))
 			else:
-			    s += "Turn {0} degrees clockwise and move forward {1} tiles\n".format(180-currentAngle, abs(horizontal))
+			    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(180-currentAngle, abs(horizontal))
 		    currentAngle = 180
 	    elif self.path[i+1][1] == self.path[i][1]:
 		# On the same column, move vertically
@@ -133,7 +133,7 @@ class Lab5(object):
 		    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(180-angle, hypotenuse)
 		else:
 		    s += "Turn {0} degrees counter clockwise and move forward {1} tiles\n".format(angle, hypotenuse)
-		    
+
 	# Display result
 	MessageBox.Show(s)
 
